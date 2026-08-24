@@ -1,0 +1,61 @@
+[
+    {
+        "id": "19da9dfde7d983cf",
+        "type": "tab",
+        "label": "Day 02 - Context 狀態記憶驗證",
+        "disabled": false
+    },
+    {
+        "id": "5b05690b7e808996",
+        "type": "inject",
+        "z": "19da9dfde7d983cf",
+        "name": "觸發計數",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 110,
+        "y": 80,
+        "wires": [
+            [
+                "3a146d9d0cf2cd87"
+            ]
+        ]
+    },
+    {
+        "id": "3a146d9d0cf2cd87",
+        "type": "function",
+        "z": "19da9dfde7d983cf",
+        "name": "累計並讀寫 Context",
+        "func": "// 從檔案儲存庫讀取 test_counter 的值（若無紀錄則預設為 0）\nlet count = flow.get('test_counter', 'file') || 0;\n\ncount += 1;\n\n// 將累加後的 count 寫回 Flow Context 鍵值 'test_counter'，並持久化至本地檔案\nflow.set('test_counter', count, 'file');\n\nmsg.payload = {\n    message: 'Context 狀態記憶正常！',\n    current_count: count,\n    storage_engine: 'localfilesystem (file)'\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 290,
+        "y": 80,
+        "wires": [
+            [
+                "d64a030116dcfc6e"
+            ]
+        ]
+    },
+    {
+        "id": "d64a030116dcfc6e",
+        "type": "debug",
+        "z": "19da9dfde7d983cf",
+        "name": "驗證輸出",
+        "active": true,
+        "x": 500,
+        "y": 80,
+        "wires": []
+    }
+]
