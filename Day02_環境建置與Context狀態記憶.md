@@ -5,7 +5,7 @@
 
 ---
 
-本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman)
+本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day02_%E7%92%B0%E5%A2%83%E5%BB%BA%E7%BD%AE%E8%88%87Context%E7%8B%80%E6%85%8B%E8%A8%98%E6%86%B6.md)
 
 ## 在 Windows 上安裝與啟動 Node-RED
 
@@ -181,11 +181,11 @@ return msg;
 
 本系列文章部分有提供 NodeRED 程式碼，可透過以下方式匯入 flow 查看
 點選右上角的選單，找到匯入的按鈕
-![1787575338407](image/Day02_環境建置與Context狀態記憶/1787575338407.png)
+![06](./image/day02/06.png)
 
 進入匯入節點視窗後，點選上方匯入所選檔案，選擇所需的 flow.json 檔案即可。
 
-![1787575395190](image/Day02_環境建置與Context狀態記憶/1787575395190.png)
+![07](image/day02/07.png)
 
 匯入之後 flow 會像是下圖所示：
 
