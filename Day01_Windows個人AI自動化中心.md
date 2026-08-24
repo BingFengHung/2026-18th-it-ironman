@@ -6,6 +6,8 @@
 
 ---
 
+本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day01_Windows%E5%80%8B%E4%BA%BAAI%E8%87%AA%E5%8B%95%E5%8C%96%E4%B8%AD%E5%BF%83.md)
+
 ## 什麼是 Node-RED？
 
 **Node-RED** 是一套以 JavaScript 為基礎的視覺化流程編排工具。讓你用簡單的「拖拉節點與連線」方式，在瀏覽器中把 Windows 本機硬體、檔案系統、PowerShell 腳本與 AI 模型串接成強大的自動化流程。
