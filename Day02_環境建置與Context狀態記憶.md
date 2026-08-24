@@ -1,7 +1,7 @@
 # Day 02：環境建置：Windows 本機 Node-RED 安裝與 Context 狀態記憶模型
 
-> 聊完了為什麼在 Windows 電腦上用 Node-RED 搭配 `agy CLI` 是個好選擇，今天就來動手把環境跑起來吧。
-> 老實說，裝環境最怕遇到那種「官方教學寫得好像很簡單，自己照著做卻噴一堆紅字」。這篇我把 Windows 上最簡單的安裝方式、避坑指南，以及 Node-RED 最關鍵的「Context 狀態記憶」一次說清楚
+> 聊完了為什麼在 Windows 電腦上用 Node-RED 搭配 `agy CLI` 是個不錯的選擇，今天就來動手把 NodeRED 環境跑起來吧。
+> 安裝環境的時候，最怕遇到那種「官方教學寫得好像很簡單，自己照著做卻噴一堆紅字」。這篇我把 Windows 上最簡單的安裝方式、避坑指南，以及 Node-RED 最關鍵的「Context 狀態記憶」一次說清楚。
 
 ---
 
@@ -177,7 +177,7 @@ return msg;
 
 ## 完整 Flow
 
-本範例 flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day02_nodered_context.json)
+### 本範例 flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day02_nodered_context.json)
 
 本系列文章部分有提供 NodeRED 程式碼，可透過以下方式匯入 flow 查看
 點選右上角的選單，找到匯入的按鈕
@@ -197,4 +197,4 @@ return msg;
 
 今天我們順利把 Node-RED 架設在 Windows 本機上，並且搞懂了讓管家具備記憶能力的 Context 模型。
 
-* **明天（Day 03）**：我們將正式把 **Google `agy.exe`** 接入終端機！
+* **明天（Day 03）**：我們將介紹 **Google `agy CLI`**！
