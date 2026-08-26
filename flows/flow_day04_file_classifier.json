@@ -1,0 +1,172 @@
+[
+    {
+        "id": "72e7a4d4a8f5c6b3",
+        "type": "tab",
+        "label": "📂 Day 04 - Downloads 檔案 AI 分類歸檔",
+        "disabled": false
+    },
+    {
+        "id": "8981e9d291fb3404",
+        "type": "inject",
+        "z": "72e7a4d4a8f5c6b3",
+        "name": "1. 手動/定時掃描",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "00 18 * * *",
+        "once": false,
+        "onceDelay": "",
+        "topic": "",
+        "payload": "",
+        "payloadType": "str",
+        "x": 150,
+        "y": 120,
+        "wires": [
+            [
+                "cd4f8e71a0f02d20"
+            ]
+        ]
+    },
+    {
+        "id": "cd4f8e71a0f02d20",
+        "type": "function",
+        "z": "72e7a4d4a8f5c6b3",
+        "name": "2. 掃描 Downloads",
+        "func": "const homedir = os.homedir();\nconst downloadsDir = path.join(homedir, 'Downloads');\nconst candidateFiles = [];\n\ntry {\n    const items = fs.readdirSync(downloadsDir);\n    for (const name of items) {\n        if (name.startsWith('.') || name.endsWith('.tmp') || name.endsWith('.crdownload')) continue;\n        const fullPath = path.join(downloadsDir, name);\n        if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {\n            candidateFiles.push({\n                original_name: name,\n                size_kb: Math.round(fs.statSync(fullPath).size / 1024),\n                ext: path.extname(name).toLowerCase()\n            });\n        }\n        if (candidateFiles.length >= 20) break;\n    }\n} catch (e) {\n    node.warn('掃描 Downloads 失敗: ' + e.message);\n}\n\nif (candidateFiles.length === 0) {\n    node.warn('Downloads 目前無新檔案需整理');\n    return null;\n}\n\nmsg.candidateFiles = candidateFiles;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 350,
+        "y": 120,
+        "wires": [
+            [
+                "c3b3b344a7b5fe38"
+            ]
+        ]
+    },
+    {
+        "id": "c3b3b344a7b5fe38",
+        "type": "function",
+        "z": "72e7a4d4a8f5c6b3",
+        "name": "3. 建立 Prompt 與 Schema (Function)",
+        "func": "const files = msg.candidateFiles;\n\nconst prompt = `你是一個專業的檔案分類專家。請為以下檔案分析用途與語意，給出建議的「子資料夾名稱」(如 TechDocs, Screenshots, Installers, Archives, Manuals) 與「標準化新檔名」: ${JSON.stringify(files)}`;\n\nconst schema = {\n      type: 'object',\n      properties: {\n        results: {\n          type: 'array',\n          items: {\n            type: 'object',\n            properties: {\n              original_name: { type: 'string', description: '原始檔名' },\n              category: {\n                type: 'string',\n                // 強制限制 AI 只能從以下固定 6 個資料夾中選擇！\n                enum: ['Documents', 'Media', 'Installers', 'Archives', 'Code', 'Others'],\n                description: '分類目標資料夾'\n              },\n              new_name: { type: 'string', description: '整理後的新檔名 (保留原副檔名)' }\n            },\n            required: ['original_name', 'category', 'new_name']\n          }\n        }\n      },\n      required: ['results']\n    };\n\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions --json-schema ${JSON.stringify(JSON.stringify(schema))} --output-format json`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 120,
+        "wires": [
+            [
+                "61a0c33662e9b1d1"
+            ]
+        ]
+    },
+    {
+        "id": "f040c61c466da378",
+        "type": "function",
+        "z": "72e7a4d4a8f5c6b3",
+        "name": "5. 自動建資料夾搬移並產出 Toast ",
+        "func": "const homedir = os.homedir();\nconst downloadsDir = path.join(homedir, 'Downloads');\nlet parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    node.error('JSON 解析失敗: ' + msg.payload);\n    return null;\n}\n\n// 雙軌解包\nlet data = parsed.structured_output;\nif (!data && parsed.response) {\n    try {\n        data = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        const match = parsed.response.match(/\\{[\\s\\S]*\\}/);\n        if (match) data = JSON.parse(match[0]);\n    }\n}\n\nconst results = (data && data.results) || parsed.results || [];\nconst moved = [];\n\nfor (const item of results) {\n    const srcPath = path.join(downloadsDir, item.original_name);\n    \n    // 🛡️ 程式碼強制規範：目標根路徑由程式寫死在 Downloads，AI 僅決定子目錄名稱\n    const folderName = (item.category || item.target_folder || 'Others').replace(/^[\\\\\\/]+/, '').trim();\n    const destDir = path.join(downloadsDir, folderName);\n    const destPath = path.join(destDir, item.new_name || item.original_name);\n\n    if (fs.existsSync(srcPath) && fs.statSync(srcPath).isFile()) {\n        fs.mkdirSync(destDir, { recursive: true }); // 自動建立 Downloads/<category>\n        fs.renameSync(srcPath, destPath);           // 搬移檔案\n        moved.push({ from: item.original_name, to: item.new_name, folder: folderName });\n    }\n}\n\n// 建立 Windows 原生 Toast PowerShell 指令\nmsg.movedCount = moved.length;\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('📂 下載區 AI 整理完畢')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('已成功分類歸檔 ${moved.length} 個檔案至 Downloads 子資料夾！')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Node-RED AI 管家').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 700,
+        "y": 200,
+        "wires": [
+            [
+                "4aebfc5e301b5017",
+                "06264fc596b39e30"
+            ]
+        ]
+    },
+    {
+        "id": "4aebfc5e301b5017",
+        "type": "debug",
+        "z": "72e7a4d4a8f5c6b3",
+        "name": "搬移歸檔成果",
+        "active": true,
+        "x": 980,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "61a0c33662e9b1d1",
+        "type": "exec",
+        "z": "72e7a4d4a8f5c6b3",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "4. 呼叫 agy cli",
+        "x": 420,
+        "y": 220,
+        "wires": [
+            [
+                "f040c61c466da378"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "06264fc596b39e30",
+        "type": "exec",
+        "z": "72e7a4d4a8f5c6b3",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "6. 彈出 Windows 原生 Toast ",
+        "x": 1020,
+        "y": 160,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    }
+]
