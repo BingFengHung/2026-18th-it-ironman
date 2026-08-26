@@ -1,4 +1,4 @@
-# Day 04｜AI 實戰 1：Downloads 下載區混亂檔案 AI 智慧分類與自動歸檔
+# Day 04：AI 實戰 1：Downloads 下載區混亂檔案 AI 智慧分類與自動歸檔
 
 > 不得不說，我的 Windows 桌面與 Downloads 資料夾，是我電腦最髒亂的地方：
 > 在 Downloads 資料夾裡面多的是甚麼 Screenshot_2026.png、install.exe、任何的 .pdf 檔案、壓縮檔，久久才會進行手動清理一次。
@@ -143,6 +143,7 @@ const schema = {
 
 msg.payload = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions --json-schema ${JSON.stringify(JSON.stringify(schema))} --output-format json`;
 return msg;
+```
 
 ---
 
