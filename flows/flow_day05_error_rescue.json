@@ -1,0 +1,104 @@
+[
+    {
+        "id": "tab_day05",
+        "type": "tab",
+        "label": "Day 05 - 終端機報錯一鍵救援 API",
+        "disabled": false
+    },
+    {
+        "id": "http_in_day05",
+        "type": "http in",
+        "z": "tab_day05",
+        "name": "POST /api/ai/rescue",
+        "url": "/api/ai/rescue",
+        "method": "post",
+        "x": 130,
+        "y": 80,
+        "wires": [
+            [
+                "fn_day05_prompt"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day05_prompt",
+        "type": "function",
+        "z": "tab_day05",
+        "name": "建立除錯 Prompt 與 Schema",
+        "func": "const errText = (typeof msg.payload === 'object' ? msg.payload.error : msg.payload) || '未知終端錯誤';\nconst prompt = `你是一個資深的 Windows 與全端除錯專家。使用者在終端機遇到以下報錯，請用一句白話文解釋原因，並給出 1~3 行最精準、可直接複製執行的修復指令: ${errText}`;\nconst schema = {\n  type: 'object',\n  properties: {\n    plain_reason: { type: 'string' },\n    fix_commands: { type: 'array', items: { type: 'string' } },\n    risk_level: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH'] }\n  },\n  required: ['plain_reason', 'fix_commands', 'risk_level']\n};\n\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions --json-schema ${JSON.stringify(JSON.stringify(schema))} --output-format json`;\nreturn msg;",
+        "outputs": 1,
+        "x": 360,
+        "y": 80,
+        "wires": [
+            [
+                "2111c2b9707f0e10"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day05_parse",
+        "type": "function",
+        "z": "tab_day05",
+        "name": "解析修復建議",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch(e) {\n    node.error('JSON 解析失敗: ' + msg.payload);\n    msg.payload = { plain_reason: 'AI 解析失敗', fix_commands: [], risk_level: 'LOW' };\n    return msg;\n}\n\n// 🛡️ 雙軌解包：取出 structured_output 或 response 內部的修復資料\nlet data = parsed.structured_output;\nif (!data && parsed.response) {\n    try {\n        data = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        const match = parsed.response.match(/\\{[\\s\\S]*\\}/);\n        if (match) data = JSON.parse(match[0]);\n    }\n}\n\nmsg.payload = data || parsed;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 80,
+        "wires": [
+            [
+                "http_out_day05",
+                "dbg_day05"
+            ]
+        ]
+    },
+    {
+        "id": "http_out_day05",
+        "type": "http response",
+        "z": "tab_day05",
+        "name": "回傳 200 OK",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 910,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "dbg_day05",
+        "type": "debug",
+        "z": "tab_day05",
+        "name": "救援輸出",
+        "active": true,
+        "x": 900,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "2111c2b9707f0e10",
+        "type": "exec",
+        "z": "tab_day05",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "呼叫 agy cli",
+        "x": 570,
+        "y": 80,
+        "wires": [
+            [
+                "fn_day05_parse"
+            ],
+            [],
+            []
+        ]
+    }
+]
