@@ -6,7 +6,7 @@
 
 ---
 
-本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day06_%E5%89%AA%E8%B2%BC%E7%B0%BF%E9%9D%9E%E7%B5%90%E6%A7%8B%E5%8C%96%E6%96%87%E5%AD%97_AI%E8%87%AA%E5%8B%95%E8%BD%89Markdown%E8%A1%A8%E6%A0%BC.md)
+本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day06_剪貼簿非結構化文字_AI自動轉Markdown表格.md)
 
 ## 痛點：手動排版表格到底有多痛苦？
 
@@ -45,6 +45,7 @@ Code               18920    370.00
 1. 拉出一個 **`http in`** 節點：
    * **Method**：`POST`
    * **URL**：`/api/ai/table`
+   * ![02](image/day06/02.png)
 
 ---
 
@@ -76,7 +77,7 @@ return msg;
 * **Command**：留空（由上游 `msg.payload` 傳入）。
 * **附加 msg.payload**：**打勾（true）**。
 * **超時 timeout**: 設定為 30 秒
-* ![02](image/day06/02.png)
+* ![03](image/day06/03.png)
 
 ---
 
@@ -158,7 +159,7 @@ Code               18920    370.00
 
 Windows 桌面右下角同步彈出 Toast：「📋 Markdown 表格已複製至剪貼簿！」，整個過程耗時不到 3 秒！
 
-![03](image/day06/03.png)
+![04](image/day06/04.png)
 
 ---
 
@@ -170,7 +171,7 @@ Windows 桌面右下角同步彈出 Toast：「📋 Markdown 表格已複製至�
 
 本案例 flow
 
-![04](image/day06/04.png)
+![05](image/day06/05.png)
 
 ---
 
