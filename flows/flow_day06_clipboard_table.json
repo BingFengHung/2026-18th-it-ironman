@@ -1,0 +1,160 @@
+[
+    {
+        "id": "tab_day06",
+        "type": "tab",
+        "label": "Day 06 - 剪貼簿文字轉 Markdown 表格",
+        "disabled": false
+    },
+    {
+        "id": "inj_day06_manual",
+        "type": "inject",
+        "z": "tab_day06",
+        "name": "手動點擊 (讀取剪貼簿)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "x": 140,
+        "y": 60,
+        "wires": [
+            [
+                "exec_day06_get_clip"
+            ]
+        ]
+    },
+    {
+        "id": "exec_day06_get_clip",
+        "type": "exec",
+        "z": "tab_day06",
+        "command": "powershell -NoProfile -Command \"Get-Clipboard\"",
+        "addpay": false,
+        "append": "",
+        "name": "抓取 Windows 剪貼簿",
+        "x": 360,
+        "y": 60,
+        "wires": [
+            [
+                "fn_day06_prompt"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "http_in_day06",
+        "type": "http in",
+        "z": "tab_day06",
+        "name": "POST /api/ai/table",
+        "url": "/api/ai/table",
+        "method": "post",
+        "x": 350,
+        "y": 140,
+        "wires": [
+            [
+                "fn_day06_prompt"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day06_prompt",
+        "type": "function",
+        "z": "tab_day06",
+        "name": "建立表格化 Prompt",
+        "func": "const rawText = (typeof msg.payload === 'object' ? msg.payload.text : msg.payload) || 'chrome 1420MB PID 15416, Code 838MB PID 1852';\n\nconst prompt = `你是一個專業的技術文檔排版助手。請將以下雜亂的非結構化文字或數據，整理為排版工整、欄位標題清晰的標準 Markdown 表格 (必須包含表頭與對齊線)。\n【嚴格要求】：直接輸出 Markdown 表格本體，絕對不要輸出任何問候語、前言、結語或 Markdown 圍欄代碼塊！\n\n原始資料內容:\n${rawText}`;\n\nmsg.rawInput = rawText;\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions --output-format json`;\nreturn msg;",
+        "outputs": 1,
+        "x": 570,
+        "y": 100,
+        "wires": [
+            [
+                "4d3cc7c3e9c85f90"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day06_write_clip",
+        "type": "function",
+        "z": "tab_day06",
+        "name": "寫回剪貼簿並彈出 Toast",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\n// 提取 AI 表格文字\nlet mdTable = (parsed.response || parsed.structured_output || msg.payload || '').trim();\n\n// 清理可能殘留的 ```markdown 標記\nmdTable = mdTable.replace(/^```markdown\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/, '').trim();\n\nmsg.markdown_table = mdTable;\n\n// 透過 Base64 編碼避免 PowerShell 特殊符號轉義問題\nconst b64 = Buffer.from(mdTable, 'utf-8').toString('base64');\n\n// 建立寫回剪貼簿與彈出 Toast 的 PowerShell 指令\nmsg.payload = `powershell -NoProfile -Command \"$md = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}')); Set-Clipboard -Value $md; [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText01); $template.GetElementsByTagName('text').Item(0).AppendChild($template.CreateTextNode('📋 Markdown 表格已複製至剪貼簿！')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Node-RED AI 管家').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\n\nreturn [msg, { payload: { markdown_table: mdTable }, req: msg.req, res: msg.res }];",
+        "outputs": 2,
+        "x": 870,
+        "y": 180,
+        "wires": [
+            [
+                "dbg_day06",
+                "eaa6b0c33dafba74"
+            ],
+            [
+                "http_out_day06"
+            ]
+        ]
+    },
+    {
+        "id": "http_out_day06",
+        "type": "http response",
+        "z": "tab_day06",
+        "name": "回傳 200 OK",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 1110,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "dbg_day06",
+        "type": "debug",
+        "z": "tab_day06",
+        "name": "轉換後 Markdown 表格",
+        "active": true,
+        "x": 1120,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "4d3cc7c3e9c85f90",
+        "type": "exec",
+        "z": "tab_day06",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "呼叫 agy cli",
+        "x": 650,
+        "y": 200,
+        "wires": [
+            [
+                "fn_day06_write_clip"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "eaa6b0c33dafba74",
+        "type": "exec",
+        "z": "tab_day06",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "執行 Set-Clipboard 與 Toast",
+        "x": 1140,
+        "y": 120,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    }
+]
