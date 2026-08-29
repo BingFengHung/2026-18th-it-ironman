@@ -119,8 +119,10 @@ return msg;
 
 在 Function 節點中，利用 Node.js 內建的 `os`、`fs`、`path` 將日報覆蓋保存到使用者家目錄的 `DailyReports/` 下（每次執行都會把當天最完整的日報更新進去）：
 
+![](image/day07/06.png)
+
 ```javascript
-// Function 節點：存檔並發送通知 (Setup 頁籤注入 os, fs, path)
+// 存檔並發送通知 (Setup 頁籤注入 os, fs, path)
 let parsed;
 try {
     parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
@@ -187,7 +189,7 @@ function daily-report {
 
 不論你何時在終端機輸入 `daily-report`，AI 都會輸出如下的高水準專業日報：
 
-![06](image/day07/06.png)
+![06](image/day07/07.png)
 
 ```markdown
 # 📅 開發工作日報 (2026-08-23)
@@ -210,7 +212,7 @@ function daily-report {
 ```
 
 Windows 桌面右下角同步彈出：
-![07](image/day07/07.png)
+![07](image/day07/08.png)
 
 ---
 
@@ -222,7 +224,7 @@ Windows 桌面右下角同步彈出：
 
 本案例 flow
 
-![08](image/day07/08.png)
+![08](image/day07/09.png)
 
 ---
 
@@ -230,4 +232,4 @@ Windows 桌面右下角同步彈出：
 
 今天我們打破了「定時排程寫死 18:00」的僵化思維，打造了「隨叫隨到、加班自動補全、增量覆蓋」的智慧日報生成自動流程。
 
-* **明天（Day 08）**：我們將挑戰第一個全自動守護場景——**電腦突然風扇狂轉？AI 秒級即時根因診斷！**
+* **明天（Day 08）**：我們將看到一個全自動守護場景——**電腦突然風扇狂轉？AI 秒級即時根因診斷！**
