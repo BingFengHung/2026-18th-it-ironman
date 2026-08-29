@@ -1,0 +1,183 @@
+[
+    {
+        "id": "tab_day07",
+        "type": "tab",
+        "label": "Day 07 - Git 提交自動產出工作日報",
+        "disabled": false
+    },
+    {
+        "id": "inj_day07_cron",
+        "type": "inject",
+        "z": "tab_day07",
+        "name": "下班保底排程 (每天 18:00 / 點擊即產出)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "x": 190,
+        "y": 40,
+        "wires": [
+            [
+                "exec_day07_git"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_day07",
+        "type": "http in",
+        "z": "tab_day07",
+        "name": "POST /api/ai/report (終端指令觸發)",
+        "url": "/api/ai/report",
+        "method": "post",
+        "x": 160,
+        "y": 100,
+        "wires": [
+            [
+                "exec_day07_git"
+            ]
+        ]
+    },
+    {
+        "id": "exec_day07_git",
+        "type": "exec",
+        "z": "tab_day07",
+        "command": "powershell -NoProfile -Command \"git log --since='midnight' --pretty=format:'* [%h] %s (%an)' --no-merges\"",
+        "addpay": false,
+        "append": "",
+        "name": "抓取今日凌晨至今所有 Git Commits",
+        "x": 500,
+        "y": 80,
+        "wires": [
+            [
+                "fn_day07_prompt"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "fn_day07_prompt",
+        "type": "function",
+        "z": "tab_day07",
+        "name": "建立工作日報 Prompt",
+        "func": "const rawCommits = (msg.payload || '').trim();\nconst customNotes = (msg.req && msg.req.body && msg.req.body.notes ? msg.req.body.notes : (msg.notes || '')).trim();\n\nlet workSummary = '';\n\nif (rawCommits && customNotes) {\n    workSummary = `今日 Git 提交紀錄:\\n${rawCommits}\\n\\n其他工作協作事項 (非代碼提交):\\n${customNotes}`;\n} else if (rawCommits) {\n    workSummary = `今日 Git 提交紀錄:\\n${rawCommits}`;\n} else if (customNotes) {\n    workSummary = `今日無代碼提交，主要工作事項摘要:\\n${customNotes}`;\n} else {\n    workSummary = `今日無 Git 提交紀錄 (主要進行跨部門需求對齊、系統架構調研、技術選型評估與 Code Review 協作)。`;\n}\n\nconst today = new Date().toISOString().slice(0, 10);\n\nconst prompt = `你是一位專業的技術主管。請根據以下開發者「今天 (${today})」的工作成果與協作紀錄，產出一份排版清晰、語氣專業、結構嚴謹的每日工作日報 (Markdown 格式)。\n\n日報必須包含以下 4 大核心區塊：\n1. 🎯 今日核心成果摘要 (1~2 句話精準概括整體進度)\n2. 🚀 新增功能與模組推進 (條列具體開發或調研成果)\n3. 🛠️ 缺陷修復與技術重構 (條列優化項目或排查進度)\n4. 📌 明日推進規劃事項 (根據今日進度推演明日待辦)\n\n今日工作成果數據:\n${workSummary}`;\n\nmsg.prompt = prompt;\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions --output-format json`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 760,
+        "y": 60,
+        "wires": [
+            [
+                "294ba0231c25126a"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day07_save",
+        "type": "function",
+        "z": "tab_day07",
+        "name": "覆蓋存檔 DailyReports 並發送 Toast",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet reportContent = (parsed.response || parsed.structured_output || msg.payload || '').trim();\n\nreportContent = reportContent.replace(/^```markdown\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/, '').trim();\n\nconst homedir = os.homedir();\nconst dir = path.join(homedir, 'DailyReports');\nfs.mkdirSync(dir, { recursive: true });\n\nconst todayStr = new Date().toISOString().slice(0, 10);\nconst filePath = path.join(dir, `${todayStr}_WorkLog.md`);\n\nfs.writeFileSync(filePath, reportContent, 'utf-8');\n\nmsg.savedPath = filePath;\nmsg.reportContent = reportContent;\n\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('📅 每日工作日報已生成！')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('已覆蓋儲存至 DailyReports/${todayStr}_WorkLog.md')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Node-RED AI 管家').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\n\nreturn [msg, { payload: { status: 'SUCCESS', savedPath: filePath, content: reportContent }, req: msg.req, res: msg.res }];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 620,
+        "y": 240,
+        "wires": [
+            [
+                "dbg_day07",
+                "c238a9a60c6d0cb9"
+            ],
+            [
+                "http_out_day07"
+            ]
+        ]
+    },
+    {
+        "id": "http_out_day07",
+        "type": "http response",
+        "z": "tab_day07",
+        "name": "回傳 200 OK",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 910,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "dbg_day07",
+        "type": "debug",
+        "z": "tab_day07",
+        "name": "日報生成成果",
+        "active": true,
+        "x": 920,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "294ba0231c25126a",
+        "type": "exec",
+        "z": "tab_day07",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "呼叫 agy cli",
+        "x": 370,
+        "y": 240,
+        "wires": [
+            [
+                "fn_day07_save"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "c238a9a60c6d0cb9",
+        "type": "exec",
+        "z": "tab_day07",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "彈出 Windows Toast",
+        "x": 940,
+        "y": 180,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    }
+]
