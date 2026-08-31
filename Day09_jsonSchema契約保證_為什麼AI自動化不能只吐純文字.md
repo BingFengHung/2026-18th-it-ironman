@@ -1,4 +1,4 @@
-# Day 09｜AI 核心：`--json-schema` 契約保證（為什麼自動化不能只輸出純文字？）
+# Day 09：AI 核心：`--json-schema` 契約保證（為什麼自動化不能只輸出純文字？）
 
 > 在前面幾天的實戰中，你一定注意到了我們呼叫 `agy CLI` 時，都會帶上一個特殊的參數：`--json-schema`。
 > 初學者常問一個直覺的問題：「直接叫 AI 輸出純文字或 Markdown 不就好了嗎？為什麼一定要大費周章定義 JSON Schema？」
@@ -6,20 +6,23 @@
 
 ---
 
+本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day09_jsonSchema契約保證_為什麼AI自動化不能只吐純文字.md)
+
 ## 純文字 vs 結構化 JSON：給誰看的差別？
 
 核心原則只有一句話：
 
-* **給人類眼睛看的** ➔ 輸出 **純文字（Text / Markdown）** 確實最直覺。
+* **給人類閱讀看的** ➔ 輸出 **純文字（Text / Markdown）** 確實最直覺。
 * **要給後面的程式碼繼續「自動搬檔案、做條件判斷、存資料庫」的** ➔ 必須輸出 **結構化資料（JSON + Schema）**！
 
 ![純文字與結構化契約對比](image/day09/01.png)
 
 ---
 
-## 沒有 `--json-schema` 時，自動化會遇到的「三大崩潰災難」
 
-### 災難 1：Markdown 圍欄污染 ➔ `JSON.parse` 直接爆炸
+## 沒有 `--json-schema` 時，自動化會遇到的三個問題
+
+### 問題 1：Markdown 圍欄污染 ➔ `JSON.parse` 直接爆炸
 
 * **Prompt 期望**：你明明在 Prompt 寫著：「請只回傳 JSON，絕對不要任何廢話！」
 * **AI 偶爾吐出**：
@@ -34,7 +37,7 @@
 
 ---
 
-### 災難 2：欄位名稱隨機漂移（Key Drift） ➔ 下游讀到 `undefined`
+### 問題 2：欄位名稱隨機漂移（Key Drift） ➔ 下游讀到 `undefined`
 
 * **第 1 次執行**：AI 吐出的 key 叫 `{"severity": "CRITICAL"}` ➔ 下游 Switch 節點正常分流。
 * **第 10 次執行**：AI 心情好突然自己改名叫 `{"level": "CRITICAL"}` 或 `{"risk_level": "HIGH"}`。
@@ -42,7 +45,7 @@
 
 ---
 
-### 災難 3：型別不一致（Type Mutation）
+### 問題 3：型別不一致（Type Mutation）
 
 * 下游需要陣列 `files: ["a.png", "b.png"]` 來跑迴圈 `forEach`。
 * 結果 AI 遇到只有 1 個檔案時，自作聰明吐出字串 `files: "a.png"`。
@@ -104,7 +107,7 @@ return msg;
 
 ## 防禦性程式設計：Node-RED「雙軌解包」守護神
 
-即使有了 `--json-schema`，在工業級自動化中，我們依然建議在 Function 節點中加入 **「雙軌解包防禦」**：
+即便有了 `--json-schema`，在自動化中建議在 Function 節點中加入 **「雙軌解包防禦」**：
 
 ```javascript
 // 雙軌解包防禦
@@ -135,6 +138,6 @@ return msg;
 
 ## 今日總結與明日預告
 
-`--json-schema` 是把 AI 從「偶爾抽筋的聊天機器人」昇華為「工業級可靠 API」的決定性基石。
+`--json-schema` 是將隨機生成的生成式模型，轉化為高可用架構與穩定 API 的關鍵機制。
 
 * **明天（Day 10）**：我們將學習如何幫 Prompt 瘦身——**用 JSONata 與純 JS 前置壓縮長日誌，省下 80% Token 與推理時間**！
