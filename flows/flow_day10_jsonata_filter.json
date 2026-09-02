@@ -1,0 +1,114 @@
+[
+  {
+    "id": "tab_day10",
+    "type": "tab",
+    "label": "Day 10 - Prompt 前置壓縮與 JSONata 瘦身",
+    "disabled": false
+  },
+  {
+    "id": "inj_day10_raw_log",
+    "type": "inject",
+    "z": "tab_day10",
+    "name": "模擬輸入 3000 字原始 Windows 日誌",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"EventID\":1000,\"Provider\":{\"Name\":\"Application Error\"},\"TimeCreated\":\"2026-08-23T10:00:00Z\",\"ProcessName\":\"Code.exe\",\"ProcessId\":15416,\"Message\":\"Faulting application name: Code.exe, version: 1.85.1.0, time stamp: 0x6579f648\\nFaulting module name: ntdll.dll, version: 10.0.22621.2506\\nException code: 0xc0000005\\nFault offset: 0x000000000001f370\\nFaulting process id: 0x3d94\\nRawStackData: A7F4B2...[3000 chars omitted]\"}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 190,
+    "y": 120,
+    "wires": [
+      [
+        "ch_day10_jsonata"
+      ]
+    ]
+  },
+  {
+    "id": "ch_day10_jsonata",
+    "type": "change",
+    "z": "tab_day10",
+    "name": "1. Change 節點 (JSONata 結構萃取)",
+    "rules": [
+      {
+        "t": "set",
+        "p": "compact_event",
+        "pt": "msg",
+        "to": "{\n  \"event_id\": payload.EventID,\n  \"app\": payload.ProcessName,\n  \"error_snippet\": $substring(payload.Message, 0, 150)\n}",
+        "tot": "jsonata"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 480,
+    "y": 120,
+    "wires": [
+      [
+        "fn_day10_prompt"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day10_prompt",
+    "type": "function",
+    "z": "tab_day10",
+    "name": "2. 合成極簡 Prompt (Function)",
+    "func": "const info = msg.compact_event || {};\nconst prompt = `Windows 應用崩潰: 程式=${info.app}, 事件ID=${info.event_id}, 描述: ${info.error_snippet}。請給出白話原因與建議修復指令。`;\n\nconst schema = {\n  type: 'object',\n  properties: {\n    plain_cause: { type: 'string', description: '白話崩潰原因' },\n    recommended_cmd: { type: 'string', description: '修復指令' }\n  },\n  required: ['plain_cause', 'recommended_cmd']\n};\n\nmsg.compressedPrompt = prompt;\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions --json-schema ${JSON.stringify(JSON.stringify(schema))} --output-format json`;\nreturn msg;",
+    "outputs": 1,
+    "x": 760,
+    "y": 120,
+    "wires": [
+      [
+        "exec_day10_agy"
+      ]
+    ]
+  },
+  {
+    "id": "exec_day10_agy",
+    "type": "exec",
+    "z": "tab_day10",
+    "command": "",
+    "addpay": false,
+    "name": "3. 調用 agy.exe 推理 (Exec)",
+    "x": 1010,
+    "y": 120,
+    "wires": [
+      [
+        "fn_day10_parse"
+      ],
+      [],
+      []
+    ]
+  },
+  {
+    "id": "fn_day10_parse",
+    "type": "function",
+    "z": "tab_day10",
+    "name": "4. 雙軌安全解包 (Function)",
+    "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    node.error('JSON 解析失敗: ' + msg.payload);\n    return null;\n}\n\n// 雙軌解包：優先取出 structured_output，若無則從 response 解包\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        const match = parsed.response.match(/\\{[\\s\\S]*\\}/);\n        if (match) result = JSON.parse(match[0]);\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+    "outputs": 1,
+    "x": 1240,
+    "y": 120,
+    "wires": [
+      [
+        "dbg_day10_result"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day10_result",
+    "type": "debug",
+    "z": "tab_day10",
+    "name": "AI 秒級診斷成果",
+    "active": true,
+    "x": 1470,
+    "y": 120,
+    "wires": []
+  }
+]
