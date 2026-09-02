@@ -1,0 +1,222 @@
+[
+    {
+        "id": "tab_day11",
+        "type": "tab",
+        "label": "Day 11 - AI 自主檢索記憶庫 (Text-to-SQL)",
+        "disabled": false
+    },
+    {
+        "id": "inj_day11_incident",
+        "type": "inject",
+        "z": "tab_day11",
+        "name": "觸發異常事件 (vmmemWSL 高佔用)",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"process_name\":\"vmmemWSL\",\"memory_mb\":3200,\"pid\":4120}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "x": 180,
+        "y": 60,
+        "wires": [
+            [
+                "fn_day11_gen_sql_prompt"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day11_gen_sql_prompt",
+        "type": "function",
+        "z": "tab_day11",
+        "name": "1. 組裝 SQL 生成 Prompt (Function)",
+        "func": "const current = msg.payload;\nmsg.currentEvent = current;\n\nconst homedir = os.homedir();\nconst logDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(logDir, { recursive: true });\n\nconst schema = {\n  type: 'object',\n  properties: {\n    thought: { type: 'string', description: '關聯進程、閾值與檢索策略思考' },\n    sql: { type: 'string', description: 'SQLite SELECT 查詢語句' }\n  },\n  required: ['thought', 'sql']\n};\n\nconst schemaFile = path.join(logDir, 'schema_sql.json');\nfs.writeFileSync(schemaFile, JSON.stringify(schema, null, 2), 'utf-8');\n\nconst prompt = `你是一位資深的 Windows 系統架構師與自動化維運專家。\n當前監控系統捕獲到一筆即時異常事件：\n- 進程名稱: ${current.process_name} (PID: ${current.pid})\n- 記憶體佔用: ${current.memory_mb} MB\n\n本機 SQLite 資料庫已記錄過去事故，資料表結構為：\nCREATE TABLE system_incidents (\n    id INTEGER PRIMARY KEY,\n    timestamp DATETIME,\n    process_name TEXT,\n    memory_mb REAL,\n    last_action TEXT\n);\n\n為了對此異常進行最深度的 RCA 根因診斷，請不要受限於單一進程名稱！\n請自主分析可能與其連鎖關聯的進程生態（例如 Docker、WSL、編譯器等）、合理的嚴重度閾值，並寫出一條最有參考價值的 SQLite SELECT 查詢語句（最多檢索 5 筆，按 timestamp 降序）。`;\n\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --output-format json --effort low --dangerously-skip-permissions --json-schema \"${schemaFile.replace(/\\\\/g, '/')}\"`;\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 490,
+        "y": 60,
+        "wires": [
+            [
+                "exec_day11_gen_sql"
+            ]
+        ]
+    },
+    {
+        "id": "exec_day11_gen_sql",
+        "type": "exec",
+        "z": "tab_day11",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "60",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. AI 自主生成檢索 SQL (Exec)",
+        "x": 830,
+        "y": 60,
+        "wires": [
+            [
+                "fn_day11_prepare_sqlite"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "fn_day11_prepare_sqlite",
+        "type": "function",
+        "z": "tab_day11",
+        "name": "3. 解析 SQL 並組裝 SQLite 查詢 (Function)",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    node.error('AI SQL 生成失敗: ' + msg.payload);\n    return null;\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        const match = parsed.response.match(/\\{[\\s\\S]*\\}/);\n        if (match) result = JSON.parse(match[0]);\n    }\n}\n\nmsg.retrievalThought = (result && result.thought) ? result.thought : '自主分析關聯生態系';\nlet generatedSql = (result && result.sql) ? result.sql.trim() : '';\n\n// 🛡️ 安全防禦：確保僅允許執行 SELECT 查詢\nif (!/^select\\b/i.test(generatedSql)) {\n    generatedSql = `SELECT timestamp, process_name, memory_mb, last_action FROM system_incidents WHERE process_name = '${msg.currentEvent.process_name}' ORDER BY timestamp DESC LIMIT 5;`;\n}\n\nconst homedir = os.homedir();\nconst logDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(logDir, { recursive: true });\nconst dbPath = path.join(logDir, 'pc_guardian.db').replace(/\\\\/g, '/');\n\nconst proc = (msg.currentEvent.process_name || 'unknown').replace(/'/g, \"''\");\nconst mem = Number(msg.currentEvent.memory_mb) || 0;\n\n// 組合 SQL：初始化資料表 + 預置示範數據 + 寫入當前異常 + 執行 AI 的動態查詢\nconst fullSql = `\nCREATE TABLE IF NOT EXISTS system_incidents (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    timestamp DATETIME DEFAULT (datetime('now', 'localtime')),\n    process_name TEXT NOT NULL,\n    memory_mb REAL NOT NULL,\n    last_action TEXT\n);\nINSERT INTO system_incidents (timestamp, process_name, memory_mb, last_action)\nSELECT '2026-08-28 14:20:00', '${proc}', 2800, '手動重啟 Docker'\nWHERE NOT EXISTS (SELECT 1 FROM system_incidents);\n\nINSERT INTO system_incidents (timestamp, process_name, memory_mb, last_action)\nSELECT '2026-08-30 09:15:00', '${proc}', 3100, '執行 wsl --shutdown'\nWHERE (SELECT count(*) FROM system_incidents) = 1;\n\nINSERT INTO system_incidents (process_name, memory_mb, last_action)\nVALUES ('${proc}', ${mem}, '觸發即時 RCA 診斷');\n\n${generatedSql}\n`.trim().replace(/\\r?\\n/g, ' ');\n\nmsg.generatedSql = generatedSql;\nmsg.payload = `sqlite3 -json \"${dbPath}\" \"${fullSql}\"`;\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 230,
+        "y": 160,
+        "wires": [
+            [
+                "exec_day11_sqlite"
+            ]
+        ]
+    },
+    {
+        "id": "exec_day11_sqlite",
+        "type": "exec",
+        "z": "tab_day11",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "10",
+        "winHide": false,
+        "oldrc": false,
+        "name": "4. 執行 SQLite CLI 查詢 (Exec)",
+        "x": 580,
+        "y": 160,
+        "wires": [
+            [
+                "fn_day11_rca_prompt"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "fn_day11_rca_prompt",
+        "type": "function",
+        "z": "tab_day11",
+        "name": "5. 拼接歷史記憶與 RCA Prompt (Function)",
+        "func": "const current = msg.currentEvent || {};\nlet history = [];\n\ntry {\n    history = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : (msg.payload || []);\n} catch (e) {\n    history = [];\n}\n\nconst historyList = history.map(h => `- [${h.timestamp}] 進程 ${h.process_name} 佔用 ${h.memory_mb} MB (前次處置: ${h.last_action || '無'})`).join('\\n');\nconst userProfile = '使用者主要進行 WSL2 Linux 容器開發、Docker 與 VS Code 專案編譯。';\n\nconst prompt = `你是一個個人專屬的 Windows 系統維運顧問。請根據「當前異常」、「AI 自主檢索策略」與「SQLite 歷史事件庫」進行深度 RCA 根因診斷：\\n\\n【當前異常事件】:\\n- 進程: ${current.process_name} (PID: ${current.pid})\\n- 記憶體佔用: ${current.memory_mb} MB\\n\\n【AI 自主檢索策略與思考】:\\n- 執行之動態 SQL: ${msg.generatedSql}\\n- 策略思考: ${msg.retrievalThought}\\n\\n【自本機 SQLite 調取出的歷史關聯事件】:\\n${historyList || '無相關歷史異常紀錄'}\\n\\n【使用者個人開發環境背景 (Profile)】:\\n${userProfile}\\n\\n請結合關聯進程生態（WSL 與 Docker 交互影響）與歷史趨勢，給出深度分析與量身定做的處置方案。`;\n\nconst schema = {\n  type: 'object',\n  properties: {\n    retrieval_analysis: { type: 'string', description: '對檢索出的跨進程歷史數據之關聯分析' },\n    root_cause: { type: 'string', description: '深層技術根因 (RCA)' },\n    action_plan: { type: 'string', description: '量身定制的修復動作與預防建議' }\n  },\n  required: ['retrieval_analysis', 'root_cause', 'action_plan']\n};\n\nconst homedir = os.homedir();\nconst logDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(logDir, { recursive: true });\nconst schemaFile = path.join(logDir, 'schema_rca.json');\nfs.writeFileSync(schemaFile, JSON.stringify(schema, null, 2), 'utf-8');\n\nmsg.payload = `agy -p ${JSON.stringify(prompt)} --output-format json --effort low --dangerously-skip-permissions --json-schema \"${schemaFile.replace(/\\\\/g, '/')}\"`;\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 920,
+        "y": 160,
+        "wires": [
+            [
+                "exec_day11_rca"
+            ]
+        ]
+    },
+    {
+        "id": "exec_day11_rca",
+        "type": "exec",
+        "z": "tab_day11",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "60",
+        "winHide": false,
+        "oldrc": false,
+        "name": "6. AI 深度根因診斷 (Exec)",
+        "x": 230,
+        "y": 260,
+        "wires": [
+            [
+                "fn_day11_parse"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "fn_day11_parse",
+        "type": "function",
+        "z": "tab_day11",
+        "name": "7. 雙軌安全解包 (Function)",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    node.error('JSON 解析失敗: ' + msg.payload);\n    return null;\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        const match = parsed.response.match(/\\{[\\s\\S]*\\}/);\n        if (match) result = JSON.parse(match[0]);\n    }\n}\n\nmsg.payload = {\n    executed_sql: msg.generatedSql,\n    retrieval_thought: msg.retrievalThought,\n    diagnosis: result || parsed\n};\n\ntry {\n    const homedir = os.homedir();\n    fs.writeFileSync(path.join(homedir, 'SystemLogs', 'latest_diagnosis.json'), JSON.stringify(msg.payload, null, 2), 'utf-8');\n} catch (err) {}\n\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 540,
+        "y": 260,
+        "wires": [
+            [
+                "dbg_day11_output"
+            ]
+        ]
+    },
+    {
+        "id": "dbg_day11_output",
+        "type": "debug",
+        "z": "tab_day11",
+        "name": "具備主動記憶的 AI 診斷成果",
+        "active": true,
+        "x": 840,
+        "y": 260,
+        "wires": []
+    }
+]
