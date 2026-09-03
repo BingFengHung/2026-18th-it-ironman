@@ -1,0 +1,126 @@
+[
+    {
+        "id": "tab_day12",
+        "type": "tab",
+        "label": "Day 12 - AI 雙層安全防線與隔離區機制",
+        "disabled": false
+    },
+    {
+        "id": "inj_day12_safe",
+        "type": "inject",
+        "z": "tab_day12",
+        "name": "情境 1：模擬垃圾安裝檔 (test_old_installer.exe)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "",
+        "topic": "",
+        "payload": "{\"file_path\":\"%USERPROFILE%\\\\Downloads\\\\test_old_installer.exe\"}",
+        "payloadType": "json",
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "fn_day12_whitelist"
+            ]
+        ]
+    },
+    {
+        "id": "inj_day12_danger",
+        "type": "inject",
+        "z": "tab_day12",
+        "name": "情境 2：模擬危險檔案 (.env)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "",
+        "topic": "",
+        "payload": "{\"file_path\":\"%USERPROFILE%\\\\Downloads\\\\.env\"}",
+        "payloadType": "json",
+        "x": 160,
+        "y": 160,
+        "wires": [
+            [
+                "fn_day12_whitelist"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day12_whitelist",
+        "type": "function",
+        "z": "tab_day12",
+        "name": "1. 第 1 道防線：硬性白名單攔截 (Function)",
+        "func": "const homedir = os.homedir();\nconst PROTECTED_EXTS = ['.git', '.env', '.key', '.pem', '.sln', '.docx', '.xlsx', '.pptx', '.rs', '.go'];\nconst PROTECTED_PATHS = ['c:/windows', 'c:/program files', path.join(homedir, 'Desktop/Projects').replace(/\\\\/g, '/').toLowerCase()];\n\nconst rawPath = (msg.payload && msg.payload.file_path) || '';\nconst resolvedPath = rawPath.replace(/%USERPROFILE%/i, homedir);\nconst normalizedPath = resolvedPath.replace(/\\\\/g, '/').toLowerCase();\n\n// 檢查受保護副檔名 (包含 .env 相關檔)\nconst isProtectedExt = PROTECTED_EXTS.some(ext => normalizedPath.endsWith(ext) || normalizedPath.includes('/.env'));\n// 檢查受保護目錄\nconst isProtectedPath = PROTECTED_PATHS.some(dir => normalizedPath.startsWith(dir));\n\nif (isProtectedExt || isProtectedPath) {\n    node.warn(`🛑 [安全攔截] 檔案「${rawPath}」為受保護核心資產，AI 絕對不可操作！`);\n    \n    // 記錄安全攔截審計日誌\n    const auditDir = path.join(homedir, 'SystemLogs');\n    fs.mkdirSync(auditDir, { recursive: true });\n    const auditFile = path.join(auditDir, 'security_audit.log');\n    const logLine = `[${new Date().toISOString()}] 操作: BLOCKED | 攔截目標: ${resolvedPath} | 原因: 命中核心白名單資產\\n`;\n    fs.appendFileSync(auditFile, logLine, 'utf-8');\n\n    node.status({ fill: 'red', shape: 'ring', text: `已物理阻斷: ${path.basename(resolvedPath)}` });\n    return null; // 物理阻斷，不流入下游\n}\n\nnode.status({ fill: 'green', shape: 'dot', text: '通過安全白名單檢查' });\nmsg.payload.resolved_path = resolvedPath;\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 630,
+        "y": 120,
+        "wires": [
+            [
+                "fn_day12_quarantine"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day12_quarantine",
+        "type": "function",
+        "z": "tab_day12",
+        "name": "2. 第 2 道防線：Quarantine 隔離區搬移 (Function)",
+        "func": "const homedir = os.homedir();\nconst today = new Date().toISOString().slice(0, 10);\nconst quarantineDir = path.join(homedir, '.quarantine', today);\nfs.mkdirSync(quarantineDir, { recursive: true });\n\nconst srcPath = msg.payload.resolved_path || (msg.payload.file_path || '').replace(/%USERPROFILE%/i, homedir);\nconst fileName = path.basename(srcPath);\nconst destPath = path.join(quarantineDir, fileName);\n\nlet status = 'SIMULATED_QUARANTINE';\n\n// 以搬入隔離區代替物理刪除，保留 30 天反悔期\nif (fs.existsSync(srcPath)) {\n    fs.renameSync(srcPath, destPath);\n    node.warn(`📦 [已安全隔離] 檔案已移入: ${destPath}`);\n    status = 'QUARANTINED';\n}\n\n// 寫入審計追蹤日誌 (Audit Trail)\nconst auditDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(auditDir, { recursive: true });\nconst auditFile = path.join(auditDir, 'security_audit.log');\nconst logLine = `[${new Date().toISOString()}] 操作: ${status} | 原路徑: ${srcPath} | 隔離路徑: ${destPath}\\n`;\nfs.appendFileSync(auditFile, logLine, 'utf-8');\n\nnode.status({ fill: 'blue', shape: 'dot', text: `已隔離: ${fileName}` });\nmsg.payload = {\n    status: status,\n    original: srcPath,\n    current: destPath,\n    audit_logged: true,\n    retention_days: 30\n};\n\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 750,
+        "y": 220,
+        "wires": [
+            [
+                "dbg_day12_safe"
+            ]
+        ]
+    },
+    {
+        "id": "dbg_day12_safe",
+        "type": "debug",
+        "z": "tab_day12",
+        "name": "安全隔離成果",
+        "active": true,
+        "x": 1080,
+        "y": 220,
+        "wires": []
+    }
+]
