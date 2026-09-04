@@ -1,0 +1,341 @@
+[
+  {
+    "id": "tab_day13",
+    "type": "tab",
+    "label": "Day 13 - 自動化三大防呆安全鎖",
+    "disabled": false
+  },
+  {
+    "id": "inj_day13_file_1",
+    "type": "inject",
+    "z": "tab_day13",
+    "name": "情境 1：首次處理檔案",
+    "props": [
+      {
+        "p": "payload.file_path",
+        "v": "%USERPROFILE%/Downloads/test_sample.png",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 180,
+    "y": 90,
+    "wires": [
+      [
+        "fn_day13_file_lock"
+      ]
+    ]
+  },
+  {
+    "id": "inj_day13_file_2",
+    "type": "inject",
+    "z": "tab_day13",
+    "name": "情境 1：手殘重複點擊相同檔案",
+    "props": [
+      {
+        "p": "payload.file_path",
+        "v": "%USERPROFILE%/Downloads/test_sample.png",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 180,
+    "y": 150,
+    "wires": [
+      [
+        "fn_day13_file_lock"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day13_file_lock",
+    "type": "function",
+    "z": "tab_day13",
+    "name": "【防呆 1】SHA256 數位指紋防重複鎖",
+    "func": "const filePath = (msg.payload && msg.payload.file_path) || msg.payload;\n\n// 🛡️ 防禦性檢查：必須是實體檔案\nif (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {\n    node.warn(`[防禦攔截] 路徑不存在或為資料夾: ${filePath}`);\n    node.status({ fill: 'red', shape: 'ring', text: '路徑無效或不存在' });\n    return null;\n}\n\n// 步驟 1: 計算 SHA256 指紋\nconst buffer = fs.readFileSync(filePath);\nconst fingerprint = crypto.createHash('sha256').update(buffer).digest('hex');\n\n// 步驟 2: 檢查 Context 記憶庫\nconst history = flow.get('processed_history', 'file') || {};\nif (history[fingerprint]) {\n    node.warn(`🛑 [防呆 1 攔截] 檔案先前已於 ${history[fingerprint]} 處理過，本次安全略過！`);\n    node.status({ fill: 'yellow', shape: 'ring', text: '重複檔案已略過' });\n    return null;\n}\n\n// 步驟 3: 首次處理，記錄指紋\nhistory[fingerprint] = new Date().toLocaleString();\nflow.set('processed_history', history, 'file');\n\nnode.status({ fill: 'green', shape: 'dot', text: '新檔案驗證通過' });\nmsg.fileFingerprint = fingerprint;\nmsg.status = 'PASS_NEW_FILE';\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [
+      {
+        "var": "fs",
+        "module": "fs"
+      },
+      {
+        "var": "crypto",
+        "module": "crypto"
+      }
+    ],
+    "x": 480,
+    "y": 120,
+    "wires": [
+      [
+        "dbg_day13_file"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day13_file",
+    "type": "debug",
+    "z": "tab_day13",
+    "name": "放行：執行後續搬移/歸檔",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 800,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "inj_day13_alert_1",
+    "type": "inject",
+    "z": "tab_day13",
+    "name": "情境 2：CPU 狂飆警報 (手動連按狂轟測試)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"cpu\":98,\"temp\":85,\"message\":\"⚠️ 警告：CPU 負載達到 98%！\"}",
+        "vt": "json"
+      },
+      {
+        "p": "topic",
+        "v": "ALERT_CPU_OVERHEAT",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ALERT_CPU_OVERHEAT",
+    "payload": "{\"cpu\":98,\"temp\":85,\"message\":\"⚠️ 警告：CPU 負載達到 98%！\"}",
+    "payloadType": "json",
+    "x": 210,
+    "y": 240,
+    "wires": [
+      [
+        "fn_day13_alert_cooldown"
+      ]
+    ]
+  },
+  {
+    "id": "inj_day13_alert_2",
+    "type": "inject",
+    "z": "tab_day13",
+    "name": "情境 2：定期監控排程 (每 10 秒自動觸發)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"cpu\":95,\"temp\":82,\"message\":\"⚠️ 警告：CPU 負載達到 95%！\"}",
+        "vt": "json"
+      },
+      {
+        "p": "topic",
+        "v": "ALERT_CPU_OVERHEAT",
+        "vt": "str"
+      }
+    ],
+    "repeat": "10",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "ALERT_CPU_OVERHEAT",
+    "payload": "{\"cpu\":95,\"temp\":82,\"message\":\"⚠️ 警告：CPU 負載達到 95%！\"}",
+    "payloadType": "json",
+    "x": 210,
+    "y": 300,
+    "wires": [
+      [
+        "fn_day13_alert_cooldown"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day13_alert_cooldown",
+    "type": "function",
+    "z": "tab_day13",
+    "name": "【防呆 2】警報時間窗冷卻鎖 (Rate Limiter)",
+    "func": "// 🛡️ 防呆 2：時間窗冷卻鎖（避免警報推播洗版）\nconst alertKey = msg.topic || 'DEFAULT_ALERT';\nconst COOLDOWN_SECONDS = 60; // 測試設為 60 秒冷卻；生產環境可設為 10 分鐘 (600)\nconst cooldownMs = COOLDOWN_SECONDS * 1000;\nconst now = Date.now();\n\n// 從 Flow Context 讀取各警報類別的上次觸發時間\nconst alertHistory = flow.get('alert_cooldown_history') || {};\nconst lastAlertTime = alertHistory[alertKey] || 0;\nconst elapsedMs = now - lastAlertTime;\n\nif (elapsedMs < cooldownMs) {\n    const remainingSec = Math.ceil((cooldownMs - elapsedMs) / 1000);\n    node.warn(`🛑 [防呆 2 攔截] 警報「${alertKey}」冷卻中（剩 ${remainingSec} 秒），靜音略過避免洗版！`);\n    node.status({ fill: 'yellow', shape: 'ring', text: `冷卻中 (剩 ${remainingSec}s)` });\n    return null; // 攔截！不往下游發送通知\n}\n\n// 超出冷卻期，更新時間戳記並放行\nalertHistory[alertKey] = now;\nflow.set('alert_cooldown_history', alertHistory);\n\nnode.status({ fill: 'green', shape: 'dot', text: `已發送警報: ${new Date(now).toLocaleTimeString()}` });\nmsg.cooldownSeconds = COOLDOWN_SECONDS;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 510,
+    "y": 270,
+    "wires": [
+      [
+        "dbg_day13_alert"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day13_alert",
+    "type": "debug",
+    "z": "tab_day13",
+    "name": "放行：發送 LINE / Telegram 推播",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 800,
+    "y": 270,
+    "wires": []
+  },
+  {
+    "id": "inj_day13_task_1",
+    "type": "inject",
+    "z": "tab_day13",
+    "name": "情境 3：觸發長耗時任務 (執行 3 秒)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"task\":\"檔案大量備份與歸檔\",\"id\":\"job_01\"}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"task\":\"檔案大量備份與歸檔\",\"id\":\"job_01\"}",
+    "payloadType": "json",
+    "x": 190,
+    "y": 390,
+    "wires": [
+      [
+        "fn_day13_task_acquire"
+      ]
+    ]
+  },
+  {
+    "id": "inj_day13_task_2",
+    "type": "inject",
+    "z": "tab_day13",
+    "name": "情境 3：在執行中重疊觸發 (排程撞期測試)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"task\":\"檔案大量備份與歸檔\",\"id\":\"job_02\"}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"task\":\"檔案大量備份與歸檔\",\"id\":\"job_02\"}",
+    "payloadType": "json",
+    "x": 200,
+    "y": 450,
+    "wires": [
+      [
+        "fn_day13_task_acquire"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day13_task_acquire",
+    "type": "function",
+    "z": "tab_day13",
+    "name": "【防呆 3-1】獲取任務互斥鎖 (Acquire Mutex)",
+    "func": "// 🛡️ 防呆 3：排程並發互斥鎖 (避免兩次排程同時操作同個資源)\nconst isRunning = flow.get('task_is_running') || false;\nconst startTime = flow.get('task_start_time') || 0;\nconst TIMEOUT_MS = 30 * 1000; // 30 秒逾時保護，防止因例外未解鎖造成的永久死鎖\nconst now = Date.now();\n\n// 檢查前一個任務是否正在跑（且在逾時安全期內）\nif (isRunning && (now - startTime < TIMEOUT_MS)) {\n    const runningSec = Math.floor((now - startTime) / 1000);\n    node.warn(`🛑 [防呆 3 攔截] 前次任務仍在進行中（已執行 ${runningSec} 秒），本輪排程跳過！`);\n    node.status({ fill: 'yellow', shape: 'ring', text: `執行中...阻斷重入 (${runningSec}s)` });\n    return null; // 攔截！防止並發搶資源\n}\n\n// 成功獲取鎖：標記為執行中\nflow.set('task_is_running', true);\nflow.set('task_start_time', now);\n\nnode.status({ fill: 'blue', shape: 'dot', text: '已上鎖，任務執行中...' });\nmsg.taskLockTime = now;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 510,
+    "y": 420,
+    "wires": [
+      [
+        "delay_day13_work"
+      ]
+    ]
+  },
+  {
+    "id": "delay_day13_work",
+    "type": "delay",
+    "z": "tab_day13",
+    "name": "模擬耗時工作中 (3秒)",
+    "pauseType": "delay",
+    "timeout": "3",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 740,
+    "y": 420,
+    "wires": [
+      [
+        "fn_day13_task_release"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day13_task_release",
+    "type": "function",
+    "z": "tab_day13",
+    "name": "【防呆 3-2】釋放任務互斥鎖 (Release Mutex)",
+    "func": "// 🔓 任務圓滿完成：釋放互斥鎖\nflow.set('task_is_running', false);\nflow.set('task_start_time', 0);\n\nnode.status({ fill: 'green', shape: 'dot', text: '已解鎖就緒' });\n\nmsg.payload = {\n    status: 'SUCCESS',\n    message: '長任務順利完成，已自動釋放互斥鎖！',\n    finishedAt: new Date().toLocaleString()\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 740,
+    "y": 500,
+    "wires": [
+      [
+        "dbg_day13_task"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day13_task",
+    "type": "debug",
+    "z": "tab_day13",
+    "name": "完成：任務成功並解鎖",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 990,
+    "y": 500,
+    "wires": []
+  }
+]
