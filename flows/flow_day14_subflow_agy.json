@@ -1,0 +1,136 @@
+[
+    {
+        "id": "398a7646572f00fc",
+        "type": "tab",
+        "label": "Day 14 - 自製 Subflow 樂高積木",
+        "disabled": false
+    },
+    {
+        "id": "b28b84fe6d94f162",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "170af4dc9d2e649c"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "e5605464b6cc3522",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "170af4dc9d2e649c",
+        "type": "function",
+        "z": "b28b84fe6d94f162",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "542ead227534f6e1"
+            ]
+        ]
+    },
+    {
+        "id": "e5605464b6cc3522",
+        "type": "function",
+        "z": "b28b84fe6d94f162",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "542ead227534f6e1",
+        "type": "exec",
+        "z": "b28b84fe6d94f162",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "60",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "e5605464b6cc3522"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "28d0728491912b4d",
+        "type": "inject",
+        "z": "398a7646572f00fc",
+        "name": "測試 Subflow 積木",
+        "props": [
+            {
+                "p": "prompt",
+                "v": "請以繁體中文一句話解釋什麼是 Subflow 子流程",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "x": 170,
+        "y": 120,
+        "wires": [
+            [
+                "69fb6ae13763bbc3"
+            ]
+        ]
+    },
+    {
+        "id": "69fb6ae13763bbc3",
+        "type": "subflow:b28b84fe6d94f162",
+        "z": "398a7646572f00fc",
+        "name": "調用專屬 AI 積木",
+        "x": 410,
+        "y": 120,
+        "wires": [
+            [
+                "5713d794d688f841"
+            ]
+        ]
+    },
+    {
+        "id": "5713d794d688f841",
+        "type": "debug",
+        "z": "398a7646572f00fc",
+        "name": "積木輸出結果",
+        "active": true,
+        "x": 640,
+        "y": 120,
+        "wires": []
+    }
+]
