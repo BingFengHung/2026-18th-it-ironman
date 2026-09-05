@@ -94,7 +94,7 @@ Node-RED 是一套 Low Code 的平台，主要透過 JavaScript 進行程式碼�
 2. **第 1 階段（Day 04–08）｜本機 AI 效率場景大爆發**：
    - **從第 4 天直接進入 AI 實戰！**：Downloads 混亂檔案 AI 智慧分類、終端機報錯一鍵救援、剪貼簿非結構文字轉 Markdown 表格、Git 工作日報自動產出、電腦卡頓秒級 RCA 根因診斷。
 3. **第 2 階段（Day 09–16）｜讓本機 AI 變聰明、變穩定**：
-   - `--json-schema` 契約保證、Prompt 前置資料壓縮、本機 SQLite 長期記憶 RAG、雙層防誤刪安全網、防重複安全防呆鎖、封裝 `agy-ai-core` 專屬 Subflow、本機 Webhook 網關與第一階段守護流水線綜合驗收。
+   - `--json-schema` 契約保證、Prompt 前置資料壓縮、本機 SQLite 長期記憶（Agentic Text-to-SQL 動態檢索）、雙層防誤刪安全網、防重複安全防呆鎖、封裝 `agy-ai-core` 專屬 Subflow、本機 HTTP API 網關與第一階段守護流水線綜合驗收。
 4. **第 3 階段（Day 17–22）｜AI Agent 自主行動力與進階排查**：
    - Event Viewer 崩潰日誌深度分流、`agy mcp` 掛載 Windows 本機工具、Human-in-the-loop 審批門、智慧剪貼簿管家、Semaphore 號誌燈並行保護與 MD5 特徵快取。
 5. **第 4 階段（Day 23–28）｜【Windows 智慧總管家】端到端整合實戰**：
