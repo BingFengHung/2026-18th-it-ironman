@@ -1,0 +1,460 @@
+[
+    {
+        "id": "a1753094eab93512",
+        "type": "tab",
+        "label": "Day 15 - 本機 AI HTTP API 網關 (同步/非同步雙模)",
+        "disabled": false
+    },
+    {
+        "id": "fbe1123833b223bf",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "ad5bb84b5d331da7"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "bf142992c31690cb",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "b28b84fe6d94f162",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "170af4dc9d2e649c"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "e5605464b6cc3522",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "c743b6fab91263a1",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦 (1)",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "518d25cc0c7769d4"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "720bc74339d29ba8",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "ad5bb84b5d331da7",
+        "type": "function",
+        "z": "fbe1123833b223bf",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "9c758ca2230faeaa"
+            ]
+        ]
+    },
+    {
+        "id": "9c758ca2230faeaa",
+        "type": "exec",
+        "z": "fbe1123833b223bf",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "60",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "bf142992c31690cb"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "bf142992c31690cb",
+        "type": "function",
+        "z": "fbe1123833b223bf",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "170af4dc9d2e649c",
+        "type": "function",
+        "z": "b28b84fe6d94f162",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "542ead227534f6e1"
+            ]
+        ]
+    },
+    {
+        "id": "542ead227534f6e1",
+        "type": "exec",
+        "z": "b28b84fe6d94f162",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "120",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "e5605464b6cc3522"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "e5605464b6cc3522",
+        "type": "function",
+        "z": "b28b84fe6d94f162",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "518d25cc0c7769d4",
+        "type": "function",
+        "z": "c743b6fab91263a1",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "bb3bcb571866cc36"
+            ]
+        ]
+    },
+    {
+        "id": "bb3bcb571866cc36",
+        "type": "exec",
+        "z": "c743b6fab91263a1",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "180",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "720bc74339d29ba8"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "720bc74339d29ba8",
+        "type": "function",
+        "z": "c743b6fab91263a1",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "047c1d7147c20575",
+        "type": "http in",
+        "z": "a1753094eab93512",
+        "name": "POST /api/ai/ask (同步即時問答)",
+        "url": "/api/ai/ask",
+        "method": "post",
+        "x": 170,
+        "y": 100,
+        "wires": [
+            [
+                "124afcd22a708de6"
+            ]
+        ]
+    },
+    {
+        "id": "124afcd22a708de6",
+        "type": "function",
+        "z": "a1753094eab93512",
+        "name": "1. 參數預處理",
+        "func": "msg.prompt = (msg.payload && msg.payload.prompt) || '你好，請進行自我介紹';\nreturn msg;",
+        "outputs": 1,
+        "x": 420,
+        "y": 100,
+        "wires": [
+            [
+                "8b59facd2c513339"
+            ]
+        ]
+    },
+    {
+        "id": "8b59facd2c513339",
+        "type": "subflow:c743b6fab91263a1",
+        "z": "a1753094eab93512",
+        "name": "2. 🤖 agy 推理核心大腦",
+        "x": 660,
+        "y": 100,
+        "wires": [
+            [
+                "34ebf051554fefb1"
+            ]
+        ]
+    },
+    {
+        "id": "34ebf051554fefb1",
+        "type": "function",
+        "z": "a1753094eab93512",
+        "name": "3. 封裝 200 OK 契約",
+        "func": "msg.payload = {\n    status: 'SUCCESS',\n    timestamp: new Date().toISOString(),\n    answer: typeof msg.payload === 'string' ? msg.payload.trim() : msg.payload\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 920,
+        "y": 100,
+        "wires": [
+            [
+                "915dc27236ab3f20"
+            ]
+        ]
+    },
+    {
+        "id": "915dc27236ab3f20",
+        "type": "http response",
+        "z": "a1753094eab93512",
+        "name": "HTTP 200 OK",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 1150,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "1f9d0172bdadf6ae",
+        "type": "http in",
+        "z": "a1753094eab93512",
+        "name": "POST /api/ai/async (長任務非同步)",
+        "url": "/api/ai/async",
+        "method": "post",
+        "x": 170,
+        "y": 240,
+        "wires": [
+            [
+                "29f71240a4df5d7f",
+                "411d7ba638865887"
+            ]
+        ]
+    },
+    {
+        "id": "29f71240a4df5d7f",
+        "type": "function",
+        "z": "a1753094eab93512",
+        "name": "A-1. 0.1秒立即回執 (202 Accepted)",
+        "func": "const jobId = 'job_' + Date.now();\nmsg.jobId = jobId;\nmsg.statusCode = 202;\nmsg.payload = {\n    status: 'ACCEPTED',\n    job_id: jobId,\n    message: '大任務已成功受理，本機 AI 正在背景深度推理中，完成後將透過 Toast 彈窗通知！',\n    timestamp: new Date().toISOString()\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 480,
+        "y": 200,
+        "wires": [
+            [
+                "b5cd79fb4c72084a"
+            ]
+        ]
+    },
+    {
+        "id": "b5cd79fb4c72084a",
+        "type": "http response",
+        "z": "a1753094eab93512",
+        "name": "HTTP 202 Accepted",
+        "statusCode": "202",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 800,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "411d7ba638865887",
+        "type": "function",
+        "z": "a1753094eab93512",
+        "name": "B-1. 背景任務參數整理",
+        "func": "const task = (msg.payload && msg.payload.prompt) || '請對目前系統環境進行深度安全健檢報告';\nconst jobId = 'job_' + Date.now();\n\n// 建立獨立的 background message，同時設定 payload 與 prompt 避免 debug 面板顯示 undefined\nreturn {\n    jobId: jobId,\n    prompt: task,\n    payload: task\n};",
+        "outputs": 1,
+        "x": 460,
+        "y": 280,
+        "wires": [
+            [
+                "a389ad58c2817476"
+            ]
+        ]
+    },
+    {
+        "id": "a389ad58c2817476",
+        "type": "subflow:c743b6fab91263a1",
+        "z": "a1753094eab93512",
+        "name": "B-2. 🤖 agy 背景深度推理",
+        "x": 720,
+        "y": 280,
+        "wires": [
+            [
+                "d3e95ef20e49addd"
+            ]
+        ]
+    },
+    {
+        "id": "d3e95ef20e49addd",
+        "type": "function",
+        "z": "a1753094eab93512",
+        "name": "B-3. 產出報告與組裝 Toast",
+        "func": "const result = typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload, null, 2);\nconst homedir = os.homedir();\nconst logDir = path.join(homedir, 'DailyReports');\nfs.mkdirSync(logDir, { recursive: true });\n\nconst today = new Date().toISOString().slice(0, 10);\nconst filePath = path.join(logDir, `${today}_${msg.jobId || 'task'}.md`);\nfs.writeFileSync(filePath, result, 'utf-8');\n\nconst title = '🎉 本機 AI 非同步任務完成！';\nconst message = `工單: ${msg.jobId} | 報告已儲存至: DailyReports/`;\n\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('${title}')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('${message}')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('AI API 網關').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\n\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 990,
+        "y": 280,
+        "wires": [
+            [
+                "cdb222ab4feffd43",
+                "c7bd30c9080a2323"
+            ]
+        ]
+    },
+    {
+        "id": "cdb222ab4feffd43",
+        "type": "debug",
+        "z": "a1753094eab93512",
+        "name": "📊 非同步任務結果",
+        "active": true,
+        "x": 1250,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "c7bd30c9080a2323",
+        "type": "exec",
+        "z": "a1753094eab93512",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "B-4. 彈出 Windows 原生 Toast",
+        "x": 1350,
+        "y": 160,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    }
+]
