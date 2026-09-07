@@ -1,0 +1,292 @@
+[
+    {
+        "id": "8ee4a81e4548c4a7",
+        "type": "tab",
+        "label": "🛡️ Day 16 - Windows AI 智慧守護全自動流水線 (2.0 集大成版)",
+        "disabled": false
+    },
+    {
+        "id": "fbe1123833b223bf",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "ad5bb84b5d331da7"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "bf142992c31690cb",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "ad5bb84b5d331da7",
+        "type": "function",
+        "z": "fbe1123833b223bf",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "9c758ca2230faeaa"
+            ]
+        ]
+    },
+    {
+        "id": "9c758ca2230faeaa",
+        "type": "exec",
+        "z": "fbe1123833b223bf",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "60",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "bf142992c31690cb"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "bf142992c31690cb",
+        "type": "function",
+        "z": "fbe1123833b223bf",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "94dbcfdc6c18451a",
+        "type": "inject",
+        "z": "8ee4a81e4548c4a7",
+        "name": "定時 3 分鐘巡檢 (或手動點擊)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "180",
+        "once": true,
+        "onceDelay": 2,
+        "x": 170,
+        "y": 40,
+        "wires": [
+            [
+                "0876739478342f7d"
+            ]
+        ]
+    },
+    {
+        "id": "0876739478342f7d",
+        "type": "function",
+        "z": "8ee4a81e4548c4a7",
+        "name": "1. 蒐集記憶體資訊",
+        "func": "const total = os.totalmem();\nconst free = os.freemem();\nconst used = total - free;\nconst memPercent = Math.round((used / total) * 100);\nconst usedMB = Math.round(used / 1024 / 1024);\nconst totalMB = Math.round(total / 1024 / 1024);\n\n// 🛡️ 靜態閥值過濾：記憶體佔用 > 80% 判定為高負載\nconst isHighLoad = memPercent > 80;\n\nmsg.metrics = {\n    mem_used_mb: usedMB,\n    mem_total_mb: totalMB,\n    mem_percent: memPercent,\n    is_high_load: isHighLoad,\n    timestamp: new Date().toISOString()\n};\n\nmsg.payload = msg.metrics;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            }
+        ],
+        "x": 170,
+        "y": 100,
+        "wires": [
+            [
+                "4744634139c09c39"
+            ]
+        ]
+    },
+    {
+        "id": "4744634139c09c39",
+        "type": "switch",
+        "z": "8ee4a81e4548c4a7",
+        "name": "2. 負載判斷分流 (Switch)",
+        "property": "payload.is_high_load",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "true"
+            },
+            {
+                "t": "false"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 2,
+        "x": 230,
+        "y": 160,
+        "wires": [
+            [
+                "92d0cd5ee5c86289"
+            ],
+            [
+                "b6a17c367b824617"
+            ]
+        ]
+    },
+    {
+        "id": "b6a17c367b824617",
+        "type": "debug",
+        "z": "8ee4a81e4548c4a7",
+        "name": "🟢 系統正常 (0% Token 消耗)",
+        "active": true,
+        "x": 530,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "92d0cd5ee5c86289",
+        "type": "exec",
+        "z": "8ee4a81e4548c4a7",
+        "command": "powershell -NoProfile -Command \"Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 5 ProcessName, Id, @{N='Memory_MB';E={[math]::Round($_.WorkingSet64/1MB)}} | ConvertTo-Json\"",
+        "addpay": false,
+        "append": "",
+        "timer": "",
+        "winHide": false,
+        "name": "3. 蒐集 Top 5 吃記憶體進程",
+        "x": 520,
+        "y": 120,
+        "wires": [
+            [
+                "696ad35a883d8511"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "696ad35a883d8511",
+        "type": "function",
+        "z": "8ee4a81e4548c4a7",
+        "name": "4. 壓縮 + 狀態鎖防抖 + 組裝 Schema 契約 (Function)",
+        "func": "// 狀態鎖防抖：10 分鐘內不重複呼叫 AI\nconst now = Date.now();\nconst lastAlert = flow.get('last_alert_time') || 0;\nif (now - lastAlert < 10 * 60 * 1000) {\n    node.warn('⚠️ 10 分鐘內已觸發過 RCA 診斷，本次自動跳過以節省資源');\n    return null\n}\nflow.set('last_alert_time', now);\n\nlet topProcesses = [];\ntry {\n    topProcesses = JSON.parse(msg.payload);\n} catch (e) {\n    topProcesses = msg.payload;\n}\n\n// 前置資料壓縮：僅保留診斷所需關鍵欄位\nconst compressed = Array.isArray(topProcesses)\n    ? topProcesses.map(p => ({ name: p.ProcessName, pid: p.Id, mem: `${p.Memory_MB}MB` }))\n    : topProcesses;\n\nconst metrics = msg.metrics || {};\nconst prompt = `你是一個專業的 Windows 系統性能診斷專家。目前系統記憶體佔用高達 ${metrics.mem_percent}% (${metrics.mem_used_mb}MB / ${metrics.mem_total_mb}MB)。\n以下是壓縮後的 Top 5 佔用進程清單:\n${JSON.stringify(compressed)}\n\n請快速診斷根本原因 (RCA)，指出最可疑進程，並給出 1 條建議處置指令 (如重啟服務、終止進程)。`;\n\n// 嚴格契約約束\nconst schema = {\n  type: 'object',\n  properties: {\n    root_cause: { type: 'string', description: '卡頓根本原因簡述' },\n    suspect_process: { type: 'string', description: '最可疑的進程名稱' },\n    suggested_action: { type: 'string', description: '建議處置指令或動作' },\n    severity: { type: 'string', enum: ['INFO', 'WARNING', 'CRITICAL'] }\n  },\n  required: ['root_cause', 'suspect_process', 'suggested_action', 'severity']\n};\n\n// 傳遞給 Subflow 積木\nmsg.prompt = prompt;\nmsg.schema = schema;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 880,
+        "y": 120,
+        "wires": [
+            [
+                "b8ddc49f88d90ff5"
+            ]
+        ]
+    },
+    {
+        "id": "b8ddc49f88d90ff5",
+        "type": "subflow:fbe1123833b223bf",
+        "z": "8ee4a81e4548c4a7",
+        "name": "5. 🤖 agy 推理核心大腦",
+        "x": 510,
+        "y": 340,
+        "wires": [
+            [
+                "44635e5b899193bf"
+            ]
+        ]
+    },
+    {
+        "id": "44635e5b899193bf",
+        "type": "function",
+        "z": "8ee4a81e4548c4a7",
+        "name": "6. 本地歷史日誌存檔與組裝",
+        "func": "// Subflow 已經保證完成雙軌解包，直接取得純淨物件\nconst rca = msg.payload || {};\nconst homedir = os.homedir();\nconst logDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(logDir, { recursive: true });\n\n// 寫入本地歷史記錄日誌\nconst today = new Date().toISOString().slice(0, 10);\nconst logFile = path.join(logDir, `${today}_GuardianRCA.log`);\nconst logLine = `[${new Date().toLocaleTimeString()}] [${rca.severity || 'INFO'}] 根因: ${rca.root_cause} | 可疑進程: ${rca.suspect_process} | 建議: ${rca.suggested_action}\\n`;\nfs.appendFileSync(logFile, logLine, 'utf-8');\n\n// 建立 Windows 原生 Toast 彈窗\nconst toastTitle = `⚠️ 系統高負載告警 [${rca.severity || 'WARN'}]`;\nconst toastMsg = `可疑: ${rca.suspect_process} | 建議: ${rca.suggested_action}`;\n\nmsg.rcaResult = rca;\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('${toastTitle}')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('${toastMsg}')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Node-RED AI 守護神').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 780,
+        "y": 340,
+        "wires": [
+            [
+                "b28896cdabe03042",
+                "bfb01f43984151a1"
+            ]
+        ]
+    },
+    {
+        "id": "bfb01f43984151a1",
+        "type": "exec",
+        "z": "8ee4a81e4548c4a7",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "7. 彈出 Windows 原生 Toast",
+        "x": 1080,
+        "y": 300,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "b28896cdabe03042",
+        "type": "debug",
+        "z": "8ee4a81e4548c4a7",
+        "name": "🔴 RCA 診斷成果",
+        "active": true,
+        "x": 1050,
+        "y": 360,
+        "wires": []
+    }
+]
