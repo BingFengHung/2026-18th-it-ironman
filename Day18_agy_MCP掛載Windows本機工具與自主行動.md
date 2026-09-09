@@ -10,19 +10,17 @@
 
 ## 什麼是 MCP（Model Context Protocol）？
 
-在過去，要讓 AI 擁有呼叫外部工具（Tool Calling / Function Calling）或讀取本機檔案的能力，開發者面臨著巨大的工程痛點：**每家模型與平台的通訊規格完全各自為政**。
+在過去，要讓 AI 擁有呼叫外部工具（Tool Calling / Function Calling）或讀取本機檔案的能力，開發者面臨著巨大的工程痛點：**每家模型與平台的通訊規格完全各自為政**。這讓工具的複用率極低且維護成本高昂。
 
 * 如果你想讓 Claude 讀取檔案，得寫一套 Anthropic 專屬的 Tool 定義與回調；
 * 想讓 OpenAI 存取資料庫，又得按照其 Function Calling Schema 重寫一遍；
 * 若想在本地 LangChain、Semantic Kernel 或 Node-RED 串接，就必須手刻大量的「膠水代碼（Glue Code）」。
 
-這種 **$M$ 種模型 $\times N$ 種工具 $= M \times N$ 套適配器** 的碎片化生態，讓工具的複用率極低且維護成本高昂。
-
 為了解決這個困境，Anthropic 提出了 **MCP（Model Context Protocol，模型上下文協定）**，並迅速獲得開源社群與 Google `agy` 的原生全面支援。
 
 ---
 
-### 🔌 AI 時代的「USB-C 開放標準」
+### AI 時代的「USB-C 開放標準」
 
 理解 MCP 最直覺的生活化比喻就是 **硬體世界的 USB-C**：
 
@@ -35,7 +33,7 @@
 
 ---
 
-### 🧩 MCP 核心架構：三層分工角色
+### MCP 核心架構：三層分工角色
 
 在 MCP 的運作體系中，清楚劃分了三個協作角色：
 
@@ -50,7 +48,7 @@
 
 ---
 
-### 🛠️ MCP 規範的三大核心能力
+### MCP 規範的三大核心能力
 
 傳統的 Tool Calling 通常只支援單向的「執行函數」，而 MCP 規範了完整的上下文擴展生態：
 
