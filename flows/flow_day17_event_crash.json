@@ -1,0 +1,295 @@
+[
+    {
+        "id": "tab_day17",
+        "type": "tab",
+        "label": "Day 17 - Windows Event Viewer 崩潰排查與分流",
+        "disabled": false
+    },
+    {
+        "id": "fbe1123833b223bf",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "ad5bb84b5d331da7"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "bf142992c31690cb",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "ad5bb84b5d331da7",
+        "type": "function",
+        "z": "fbe1123833b223bf",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = \u0007gy -p  --dangerously-skip-permissions --effort low;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd +=  --json-schema  --output-format json;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "9c758ca2230faeaa"
+            ]
+        ]
+    },
+    {
+        "id": "9c758ca2230faeaa",
+        "type": "exec",
+        "z": "fbe1123833b223bf",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "120",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "bf142992c31690cb"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "bf142992c31690cb",
+        "type": "function",
+        "z": "fbe1123833b223bf",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "inj_day17_cron",
+        "type": "inject",
+        "z": "tab_day17",
+        "name": "定時 10 分鐘巡檢 (或手動點擊)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "600",
+        "once": true,
+        "onceDelay": 3,
+        "x": 170,
+        "y": 60,
+        "wires": [
+            [
+                "exec_day17_winevent"
+            ]
+        ]
+    },
+    {
+        "id": "exec_day17_winevent",
+        "type": "exec",
+        "z": "tab_day17",
+        "command": "powershell -NoProfile -Command \"try { Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'; Id=1000; StartTime=(Get-Date).AddMinutes(-30)} -MaxEvents 3 -ErrorAction Stop | Select-Object -Property TimeCreated, Message | ConvertTo-Json -Compress } catch { '[]' }\"",
+        "addpay": false,
+        "append": "",
+        "name": "1. 抓取最近 30 分鐘 EventID 1000 崩潰日誌",
+        "x": 230,
+        "y": 140,
+        "wires": [
+            [
+                "fn_day17_filter"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "fn_day17_filter",
+        "type": "function",
+        "z": "tab_day17",
+        "name": "2. 過濾空日誌與去重 (Function)",
+        "func": "let raw = (msg.payload || '').trim();\n\nif (!raw || raw === 'null' || raw === '[]') {\n    node.status({ fill: 'green', shape: 'dot', text: '系統穩定無崩潰' });\n    return null;\n}\n\nlet events = [];\ntry {\n    events = JSON.parse(raw);\n    if (!Array.isArray(events)) events = [events];\n} catch (e) {\n    events = [{ Message: raw, TimeCreated: new Date().toISOString() }];\n}\n\nif (events.length === 0) {\n    node.status({ fill: 'green', shape: 'dot', text: '無崩潰日誌' });\n    return null;\n}\n\nconst latest = events[0];\nconst lastHandledTime = flow.get('last_crash_time') || '';\nif (latest.TimeCreated && latest.TimeCreated === lastHandledTime) {\n    node.warn('該崩潰事件先前已處理過，自動略過');\n    return null;\n}\nflow.set('last_crash_time', latest.TimeCreated);\n\nmsg.crashData = latest;\nmsg.payload = latest.Message;\nnode.status({ fill: 'red', shape: 'dot', text: '發現崩潰日誌！' });\nreturn msg;",
+        "outputs": 1,
+        "x": 550,
+        "y": 120,
+        "wires": [
+            [
+                "fn_day17_prompt"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day17_prompt",
+        "type": "function",
+        "z": "tab_day17",
+        "name": "3. 建立 AI 診斷 Prompt 與強契約 Schema (Function)",
+        "func": "const crashText = msg.payload || 'Faulting application name: Code.exe, faulting module: ntdll.dll, exception code: 0xc0000005';\n\nconst prompt = `你是一個專業的 Windows 核心除錯專家。請分析以下 Windows Event ID 1000 (Application Error) 應用程式崩潰日誌：\n1. 找出故障應用程式名稱 (target_app)。\n2. 評定嚴重等級 (severity: CRITICAL / WARNING / NORMAL)。\n3. 用一句白話文解釋為何會崩潰 (plain_cause，解譯十六進位 Exception code 如 0xc0000005 為記憶體違規存取)。\n4. 給出 1 條建議的具體修復指令或行動 (recommended_cmd)。\n5. 判定是否為可重啟恢復的暫態故障 (is_recoverable)。\n\n崩潰日誌原文:\n${crashText}`;\n\nconst schema = {\n  type: 'object',\n  properties: {\n    target_app: { type: 'string', description: '崩潰應用程式' },\n    severity: { type: 'string', enum: ['CRITICAL', 'WARNING', 'NORMAL'] },\n    plain_cause: { type: 'string', description: '白話崩潰原因與代碼解析' },\n    recommended_cmd: { type: 'string', description: '建議修復指令或處理動作' },\n    is_recoverable: { type: 'boolean', description: '是否可重啟自癒' }\n  },\n  required: ['target_app', 'severity', 'plain_cause', 'recommended_cmd', 'is_recoverable']\n};\n\n// 直接傳遞給 Day 14 Subflow 積木\nmsg.prompt = prompt;\nmsg.schema = schema;\nreturn msg;",
+        "outputs": 1,
+        "x": 900,
+        "y": 120,
+        "wires": [
+            [
+                "subflow_day17_agy"
+            ]
+        ]
+    },
+    {
+        "id": "subflow_day17_agy",
+        "type": "subflow:fbe1123833b223bf",
+        "z": "tab_day17",
+        "name": "4. 🤖 agy 推理核心大腦 (Subflow 積木)",
+        "x": 220,
+        "y": 260,
+        "wires": [
+            [
+                "sw_day17_severity"
+            ]
+        ]
+    },
+    {
+        "id": "sw_day17_severity",
+        "type": "switch",
+        "z": "tab_day17",
+        "name": "5. severity 嚴重度三路分流 (Switch)",
+        "property": "payload.severity",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "CRITICAL",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "WARNING",
+                "vt": "str"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 3,
+        "x": 540,
+        "y": 260,
+        "wires": [
+            [
+                "fn_day17_critical"
+            ],
+            [
+                "fn_day17_warning"
+            ],
+            [
+                "dbg_day17_normal"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day17_critical",
+        "type": "function",
+        "z": "tab_day17",
+        "name": "6-1. CRITICAL: 組裝 Toast 彈窗 (Function)",
+        "func": "const rca = msg.payload || {};\nconst title = `🚨 應用程式崩潰告警: ${rca.target_app || '未知'}`;\nconst message = `原因: ${rca.plain_cause || '異常閃退'} | 建議: ${rca.recommended_cmd || '請查看事件檢視器'}`;\n\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('${title}')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('${message}')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Node-RED 崩潰守護').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\n\nreturn msg;",
+        "outputs": 1,
+        "x": 890,
+        "y": 220,
+        "wires": [
+            [
+                "52c57ff8ad6a08ac"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day17_warning",
+        "type": "function",
+        "z": "tab_day17",
+        "name": "6-2. WARNING: 寫入本機日誌庫 (Function)",
+        "func": "const rca = msg.payload || {};\nconst homedir = os.homedir();\nconst logDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(logDir, { recursive: true });\n\nconst today = new Date().toISOString().slice(0, 10);\nconst logFile = path.join(logDir, `${today}_CrashWarning.log`);\nconst line = `[${new Date().toLocaleTimeString()}] [WARNING] 程式: ${rca.target_app} | 根因: ${rca.plain_cause} | 建議: ${rca.recommended_cmd}\\n`;\nfs.appendFileSync(logFile, line, 'utf-8');\n\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 890,
+        "y": 260,
+        "wires": [
+            [
+                "dbg_day17_warning"
+            ]
+        ]
+    },
+    {
+        "id": "dbg_day17_warning",
+        "type": "debug",
+        "z": "tab_day17",
+        "name": "🟡 WARNING 存檔紀錄",
+        "active": true,
+        "x": 1190,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "dbg_day17_normal",
+        "type": "debug",
+        "z": "tab_day17",
+        "name": "🟢 NORMAL 安靜日誌",
+        "active": true,
+        "x": 820,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "52c57ff8ad6a08ac",
+        "type": "exec",
+        "z": "tab_day17",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "30",
+        "winHide": false,
+        "oldrc": false,
+        "name": "7. 彈出 Windows 原生 Toast (Exec)",
+        "x": 1220,
+        "y": 220,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    }
+]
