@@ -1,0 +1,211 @@
+[
+    {
+        "id": "0a804f71ba5d4921",
+        "type": "tab",
+        "label": "Day 20 - 智慧剪貼簿管家",
+        "disabled": false
+    },
+    {
+        "id": "0853ac3ce50bafbf",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "7d7f1bc20a4131d7"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "50b782d43790a65f",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "7d7f1bc20a4131d7",
+        "type": "function",
+        "z": "0853ac3ce50bafbf",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "d00aac09d005ec71"
+            ]
+        ]
+    },
+    {
+        "id": "d00aac09d005ec71",
+        "type": "exec",
+        "z": "0853ac3ce50bafbf",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "60",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "50b782d43790a65f"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "50b782d43790a65f",
+        "type": "function",
+        "z": "0853ac3ce50bafbf",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "f15ecc8f9de586a0",
+        "type": "inject",
+        "z": "0a804f71ba5d4921",
+        "name": "手動觸發剪貼簿解析 (或終端 cb-ai)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "x": 180,
+        "y": 60,
+        "wires": [
+            [
+                "5f755cc4046f8f8a"
+            ]
+        ]
+    },
+    {
+        "id": "7065c95b7e7f8916",
+        "type": "http in",
+        "z": "0a804f71ba5d4921",
+        "name": "POST /api/ai/clipboard",
+        "url": "/api/ai/clipboard",
+        "method": "post",
+        "x": 140,
+        "y": 100,
+        "wires": [
+            [
+                "5f755cc4046f8f8a"
+            ]
+        ]
+    },
+    {
+        "id": "5f755cc4046f8f8a",
+        "type": "exec",
+        "z": "0a804f71ba5d4921",
+        "command": "powershell -NoProfile -Command \"Get-Clipboard\"",
+        "addpay": false,
+        "name": "1. 抓取 Windows 系統剪貼簿 (Exec)",
+        "x": 500,
+        "y": 60,
+        "wires": [
+            [
+                "b57d09f3f6eaec0b"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "b57d09f3f6eaec0b",
+        "type": "function",
+        "z": "0a804f71ba5d4921",
+        "name": "2. 智能截取與組裝 Schema 契約 (Function)",
+        "func": "// 🔑 核心一：空內容防呆\nconst text = (msg.payload || '').toString().trim();\nif (!text || text.length < 5) { node.warn('剪貼簿為空，跳過'); return null; }\n\n// 🔑 核心二：截取前 800 字元脫水\nconst cleanText = text.substring(0, 800);\n\n// 🔑 核心三：JSON Schema 強制約束輸出格式\nmsg.schema = {\n  type: 'object',\n  required: ['content_type', 'summary_zh', 'action_suggestion'],\n  properties: {\n    content_type:      { type: 'string' },\n    summary_zh:        { type: 'string' },\n    action_suggestion: { type: 'string' }\n  }\n};\n\n// 🔑 核心四：Prompt 明確指定每個欄位應填入的「結果本身」，而非說明過程\nmsg.prompt = `你是智慧剪貼簿管家。請分析以下文字並回傳 JSON，欄位規定如下：\n- content_type：文字類型，只能填 ERROR_LOG / CODE_SNIPPET / ENGLISH_TEXT / GENERAL 其中之一\n- summary_zh：【直接寫結果，不要描述你在做什麼】英文→翻譯成正體中文；報錯→一句話說明錯誤原因；程式碼→說明功能\n- action_suggestion：具體的下一步建議（一到兩句話）\n\n分析文字：\n\"\"\"\n${cleanText}\n\"\"\"`;\nreturn msg;",
+        "outputs": 1,
+        "x": 330,
+        "y": 180,
+        "wires": [
+            [
+                "96481f9954755b1e"
+            ]
+        ]
+    },
+    {
+        "id": "c480d6a24388b13f",
+        "type": "function",
+        "z": "0a804f71ba5d4921",
+        "name": "4. 格式化、寫回剪貼簿與組裝 Toast",
+        "func": "const data = msg.payload || {};\nconst summary = String(data.summary_zh || '已完成解析').replace(/'/g, \"''\");\nconst advice  = String(data.action_suggestion || '').replace(/'/g, \"''\");\nconst ctype   = String(data.content_type || '內容解析').replace(/'/g, \"''\");\n\n// 🔑 Set-Clipboard：用 [char]10 串接換行（PowerShell 單引號字串不解析 `n）\n// 🔑 Toast 標題/內容：用 `n 在雙引號字串中換行（Toast 文字框）\nconst psCmd = [\n  '$nl=[char]10',\n  `Set-Clipboard -Value ('【AI 剪貼簿解析】'+$nl+'📌 摘要: ${summary}'+$nl+'💡 建議: ${advice}')`,\n  '[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null',\n  '$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)',\n  '$textNodes = $template.GetElementsByTagName(\\'text\\')',\n  `$textNodes.Item(0).AppendChild($template.CreateTextNode('📋 AI 剪貼簿: ${ctype}')) > $null`,\n  `$textNodes.Item(1).AppendChild($template.CreateTextNode('${summary}')) > $null`,\n  `[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('AI 剪貼簿管家').Show([Windows.UI.Notifications.ToastNotification]::new($template))`\n].join('; ');\n\nmsg.payload = `powershell -NoProfile -WindowStyle Hidden -Command \"${psCmd}\"`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 260,
+        "wires": [
+            [
+                "c340a6f1b4366a93"
+            ]
+        ]
+    },
+    {
+        "id": "c340a6f1b4366a93",
+        "type": "exec",
+        "z": "0a804f71ba5d4921",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": true,
+        "oldrc": false,
+        "name": "5. Set-Clipboard 與 Toast 彈窗 (Exec)",
+        "x": 710,
+        "y": 260,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "96481f9954755b1e",
+        "type": "subflow:0853ac3ce50bafbf",
+        "z": "0a804f71ba5d4921",
+        "name": "",
+        "x": 620,
+        "y": 180,
+        "wires": [
+            [
+                "c480d6a24388b13f"
+            ]
+        ]
+    }
+]
