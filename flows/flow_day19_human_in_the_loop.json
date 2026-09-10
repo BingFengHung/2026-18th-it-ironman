@@ -1,0 +1,316 @@
+[
+    {
+        "id": "tab_day19",
+        "type": "tab",
+        "label": "Day 19 - HITL 人在迴圈審批門",
+        "disabled": false
+    },
+    {
+        "id": "b28b84fe6d94f162",
+        "type": "subflow",
+        "name": "🤖 agy 推理核心大腦",
+        "info": "封裝本機 Google agy CLI 調用、JSON Schema 契約約束與雙軌解包防禦的通用積木。",
+        "category": "AI 模組",
+        "in": [
+            {
+                "x": 60,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "170af4dc9d2e649c"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 780,
+                "y": 80,
+                "wires": [
+                    {
+                        "id": "e5605464b6cc3522",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [],
+        "meta": {},
+        "color": "#DDAA99"
+    },
+    {
+        "id": "170af4dc9d2e649c",
+        "type": "function",
+        "z": "b28b84fe6d94f162",
+        "name": "1. 建立 agy 指令",
+        "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+        "outputs": 1,
+        "x": 220,
+        "y": 80,
+        "wires": [
+            [
+                "542ead227534f6e1"
+            ]
+        ]
+    },
+    {
+        "id": "542ead227534f6e1",
+        "type": "exec",
+        "z": "b28b84fe6d94f162",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "120",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 呼叫 agy.exe",
+        "x": 420,
+        "y": 80,
+        "wires": [
+            [
+                "e5605464b6cc3522"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "e5605464b6cc3522",
+        "type": "function",
+        "z": "b28b84fe6d94f162",
+        "name": "3. 雙軌解包",
+        "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+        "outputs": 1,
+        "x": 620,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "inj_day19_trigger",
+        "type": "inject",
+        "z": "tab_day19",
+        "name": "模擬 AI 建議高危操作 (2.4GB 大型安裝檔清理)",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"action\":\"CLEAN_LARGE_TEMP\",\"target_file\":\"C:\\\\Users\\\\%USERPROFILE%\\\\Downloads\\\\big_installer_v2.iso\",\"size_mb\":2450,\"reason\":\"偵測到超過 60 天未使用的超大型安裝映像檔\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "once": false,
+        "x": 230,
+        "y": 60,
+        "wires": [
+            [
+                "fn_day19_create_ticket"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day19_create_ticket",
+        "type": "function",
+        "z": "tab_day19",
+        "name": "1. 建立防重放審批工單 (TTL 10分鐘)",
+        "func": "const plan = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\nconst ticketId = 'tk_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();\n\n// 存入 Flow Context 狀態機，設定 10 分鐘有效期限\nconst pending = flow.get('pending_tickets') || {};\npending[ticketId] = {\n    plan: plan,\n    status: 'PENDING',\n    createdAt: Date.now(),\n    expiresAt: Date.now() + 10 * 60 * 1000\n};\nflow.set('pending_tickets', pending);\n\nconst approveUrl = `http://127.0.0.1:1880/api/action/approve?ticket=${ticketId}`;\nconst rejectUrl  = `http://127.0.0.1:1880/api/action/reject?ticket=${ticketId}`;\nconst dashUrl    = 'http://127.0.0.1:1880/api/hitl/dashboard';\n\n// 🛡️ 安全防禦：避免單引號與實體換行打斷 cmd.exe\nconst safeFile   = String(plan.target_file || '').replace(/'/g, \"''\");\nconst safeSize   = plan.size_mb || 0;\nconst safeReason = String(plan.reason || '').replace(/'/g, \"''\").replace(/[\\r\\n]+/g, ' ');\n\nconst title   = `🛡️ [AI 審批門] 待確認高危操作`;\n// ✅ 關鍵修正：使用 PowerShell 的跳脫換行符號 `n（而非 JS 的 \\n）\n// JS \\n 是真實換行字元，嵌入單行 PowerShell -Command 會斷行導致 error:1\nconst message = `檔案: ${safeFile} (${safeSize}MB)` + '`n' + `原因: ${safeReason}` + '`n' + `👉 審批中控台: ${dashUrl}`;\n\nmsg.ticketInfo = { ticketId, approveUrl, rejectUrl, dashUrl, plan };\n\n// 組裝單行 PowerShell 命令\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('${title}')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('${message}')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('AI 審批門守衛').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 570,
+        "y": 60,
+        "wires": [
+            [
+                "dbg_day19_ticket",
+                "5f22cff9b32bee98"
+            ]
+        ]
+    },
+    {
+        "id": "dbg_day19_ticket",
+        "type": "debug",
+        "z": "tab_day19",
+        "name": "工單與審批連結",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "ticketInfo",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 870,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "http_in_day19_approve",
+        "type": "http in",
+        "z": "tab_day19",
+        "name": "GET /api/action/approve (審批通過)",
+        "url": "/api/action/approve",
+        "method": "get",
+        "x": 190,
+        "y": 180,
+        "wires": [
+            [
+                "fn_day19_process_approval"
+            ]
+        ]
+    },
+    {
+        "id": "fn_day19_process_approval",
+        "type": "function",
+        "z": "tab_day19",
+        "name": "3. 驗證 Token、執行安全隔離與核銷 (Function)",
+        "func": "const ticketId = msg.req.query.ticket;\nconst pending = flow.get('pending_tickets') || {};\nconst ticket = pending[ticketId];\n\nif (!ticket) {\n    msg.payload = `<html><body style=\"font-family:Segoe UI;padding:30px;text-align:center;\"><h2 style=\"color:#d93025;\">❌ 審批失敗：無效或已核銷的工單 ID</h2><p>該操作可能已被處理或不存在。</p></body></html>`;\n    msg.statusCode = 404;\n    return msg;\n}\n\nif (Date.now() > ticket.expiresAt) {\n    delete pending[ticketId];\n    flow.set('pending_tickets', pending);\n    msg.payload = `<html><body style=\"font-family:Segoe UI;padding:30px;text-align:center;\"><h2 style=\"color:#e37400;\">⏰ 審批逾時：工單已過期（超過 10 分鐘）</h2><p>基於安全考量，過期工單已被自動註銷，AI 動作未執行。</p></body></html>`;\n    msg.statusCode = 410;\n    return msg;\n}\n\n// 🛡️ 單次消耗性 Token 防重放：立即核銷\nticket.status = 'APPROVED';\nticket.executedAt = Date.now();\ndelete pending[ticketId];\nflow.set('pending_tickets', pending);\n\n// 執行搬移至隔離區（絕不物理硬刪）\nconst homedir = os.homedir();\nconst today = new Date().toISOString().slice(0, 10);\nconst quarantineDir = path.join(homedir, '.quarantine', today);\nfs.mkdirSync(quarantineDir, { recursive: true });\n\nconst target = ticket.plan.target_file;\nconst fname = path.basename(target);\nconst dest = path.join(quarantineDir, fname);\n\nlet resultMsg = '已模擬安全隔離';\nif (fs.existsSync(target)) {\n    fs.renameSync(target, dest);\n    resultMsg = `檔案已成功搬移至隔離區: ${dest}`;\n}\n\nnode.warn(`✅ [人工審批通過] 工單 ${ticketId} 已執行隔離: ${dest}`);\n\nmsg.statusCode = 200;\nmsg.payload = `<html><body style=\"font-family:Segoe UI;padding:40px;text-align:center;background:#f8f9fa;\">\n<div style=\"background:#fff;max-width:550px;margin:auto;padding:30px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.1);\">\n<h2 style=\"color:#137333;\">🎉 人工審批通過！動作已安全執行</h2>\n<p style=\"color:#5f6368;font-size:15px;\">工單 ID: <code>${ticketId}</code></p>\n<hr style=\"border:none;border-top:1px solid #eee;margin:20px 0;\"/>\n<p style=\"text-align:left;line-height:1.8;\">\n<b>目標檔案</b>: ${ticket.plan.target_file}<br/>\n<b>處置方式</b>: ${resultMsg}<br/>\n<b>執行時間</b>: ${new Date().toLocaleString()}\n</p>\n<div style=\"margin-top:25px;padding:12px;background:#e6f4ea;border-radius:6px;color:#137333;font-size:14px;\">\n🛡️ 該檔案享有 30 天隔離反悔期，可隨時自隔離區還原。\n</div>\n</div>\n</body></html>`;\n\nreturn msg;",
+        "outputs": 1,
+        "libs": [
+            {
+                "var": "os",
+                "module": "os"
+            },
+            {
+                "var": "fs",
+                "module": "fs"
+            },
+            {
+                "var": "path",
+                "module": "path"
+            }
+        ],
+        "x": 550,
+        "y": 180,
+        "wires": [
+            [
+                "http_out_day19_res"
+            ]
+        ]
+    },
+    {
+        "id": "http_out_day19_res",
+        "type": "http response",
+        "z": "tab_day19",
+        "name": "回傳審批成功 HTML 頁面",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "text/html; charset=utf-8"
+        },
+        "x": 880,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "5f22cff9b32bee98",
+        "type": "exec",
+        "z": "tab_day19",
+        "command": "",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "2. 彈出 Windows 原生 Toast (Exec)",
+        "x": 940,
+        "y": 40,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "http_in_dashboard",
+        "type": "http in",
+        "z": "tab_day19",
+        "name": "GET /api/hitl/dashboard（審批中控台）",
+        "url": "/api/hitl/dashboard",
+        "method": "get",
+        "x": 190,
+        "y": 320,
+        "wires": [
+            [
+                "fn_dashboard"
+            ]
+        ]
+    },
+    {
+        "id": "fn_dashboard",
+        "type": "function",
+        "z": "tab_day19",
+        "name": "4. 產生審批中控台 HTML",
+        "func": "const pending = flow.get('pending_tickets') || {};\nconst now = Date.now();\nconst tickets = Object.entries(pending).map(([id, t]) => ({ id, ...t }));\n\nconst rows = tickets.length === 0\n  ? '<div style=\"text-align:center;color:#888;padding:60px 0;font-size:16px;\">🎉 目前沒有待審批的高危工單</div>'\n  : tickets.map(t => {\n      const expired = now > t.expiresAt;\n      const remaining = Math.max(0, Math.ceil((t.expiresAt - now) / 60000));\n      return `\n      <div style=\"background:#fff;border-radius:10px;padding:24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);border-left:5px solid ${expired ? '#e0e0e0' : '#fbbc04'};\">\n        <div style=\"display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;\">\n          <div style=\"flex:1;min-width:260px;\">\n            <div style=\"font-size:12px;color:#999;margin-bottom:6px;\">工單 ID：<code style=\"background:#f1f3f4;padding:2px 6px;border-radius:4px;font-size:11px;\">${t.id}</code></div>\n            <div style=\"font-size:16px;font-weight:600;color:#202124;margin-bottom:8px;word-break:break-all;\">📁 ${t.plan.target_file}</div>\n            <div style=\"font-size:13px;color:#5f6368;margin-bottom:4px;\">📦 大小：<b>${t.plan.size_mb} MB</b></div>\n            <div style=\"font-size:13px;color:#5f6368;margin-bottom:8px;\">💬 原因：${t.plan.reason}</div>\n            <div style=\"font-size:12px;color:${expired ? '#d93025' : '#188038'};\">\n              ${expired ? '⏰ 此工單已逾時（超過 10 分鐘），無法執行' : `⏳ 剩餘時效：<b>${remaining} 分鐘</b>`}\n            </div>\n          </div>\n          <div style=\"display:flex;flex-direction:column;gap:8px;align-items:center;min-width:120px;\">\n            ${expired\n              ? '<div style=\"color:#bbb;font-size:13px;padding:10px;\">已逾時</div>'\n              : `<a href=\"/api/action/approve?ticket=${t.id}\" style=\"display:block;background:#137333;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;text-align:center;\">✅ 批准執行</a>\n                 <a href=\"/api/action/reject?ticket=${t.id}\" style=\"display:block;background:#fff;color:#d93025;border:1px solid #d93025;padding:8px 24px;border-radius:6px;text-decoration:none;font-size:13px;text-align:center;\">❌ 拒絕</a>`\n            }\n          </div>\n        </div>\n      </div>`;\n  }).join('');\n\nconst pendingCount = tickets.filter(t => now <= t.expiresAt).length;\n\nmsg.payload = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>🛡️ AI 審批中控台</title>\n<style>\n  * { box-sizing: border-box; }\n  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 24px 16px; }\n  .header { max-width: 740px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }\n  .title-wrap h1 { color: #202124; font-size: 22px; margin: 0 0 4px; }\n  .title-wrap p  { color: #5f6368; font-size: 14px; margin: 0; }\n  .badge { display: inline-block; background: ${pendingCount > 0 ? '#ea4335' : '#34a853'}; color: #fff; border-radius: 20px; padding: 2px 10px; font-size: 13px; margin-left: 8px; vertical-align: middle; }\n  .refresh-btn { background: #4285f4; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; }\n  .refresh-btn:hover { background: #3367d6; }\n  .container { max-width: 740px; margin: 0 auto; }\n  .notice { background: #e8f0fe; border-radius: 8px; padding: 14px 18px; font-size: 13px; color: #1a73e8; margin-bottom: 20px; }\n</style>\n</head>\n<body>\n<div class=\"header\">\n  <div class=\"title-wrap\">\n    <h1>🛡️ AI 高危操作審批中控台 <span class=\"badge\">${pendingCount} 件待審</span></h1>\n    <p>請仔細確認後再點擊批准。所有操作皆採「隔離代硬刪」設計，具備 30 天反悔期。</p>\n  </div>\n  <button class=\"refresh-btn\" onclick=\"location.reload()\">🔄 重新整理</button>\n</div>\n<div class=\"container\">\n  ${pendingCount === 0 && tickets.length > 0 ? '<div class=\"notice\">ℹ️ 所有工單均已逾時自動失效</div>' : ''}\n  ${rows}\n</div>\n</body>\n</html>`;\n\nmsg.statusCode = 200;\nreturn msg;",
+        "outputs": 1,
+        "libs": [],
+        "x": 520,
+        "y": 320,
+        "wires": [
+            [
+                "http_out_dashboard"
+            ]
+        ]
+    },
+    {
+        "id": "http_out_dashboard",
+        "type": "http response",
+        "z": "tab_day19",
+        "name": "回傳中控台 HTML",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "text/html; charset=utf-8"
+        },
+        "x": 820,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "http_in_reject",
+        "type": "http in",
+        "z": "tab_day19",
+        "name": "GET /api/action/reject（拒絕）",
+        "url": "/api/action/reject",
+        "method": "get",
+        "x": 190,
+        "y": 440,
+        "wires": [
+            [
+                "fn_reject"
+            ]
+        ]
+    },
+    {
+        "id": "fn_reject",
+        "type": "function",
+        "z": "tab_day19",
+        "name": "5. 拒絕工單並核銷",
+        "func": "const ticketId = msg.req.query.ticket;\nconst pending = flow.get('pending_tickets') || {};\n\nif (!pending[ticketId]) {\n    msg.payload = `<html><body style=\"font-family:Segoe UI;padding:30px;text-align:center;\">\n<h2 style=\"color:#d93025;\">❌ 無效或已核銷的工單 ID</h2>\n<p style=\"color:#5f6368;\">該工單可能已被處理或不存在。</p>\n<a href=\"/api/hitl/dashboard\" style=\"color:#4285f4;font-size:14px;\">← 返回審批中控台</a>\n</body></html>`;\n    msg.statusCode = 404;\n    return msg;\n}\n\n// 核銷工單（拒絕）\ndelete pending[ticketId];\nflow.set('pending_tickets', pending);\nnode.warn(`🚫 [人工拒絕] 工單 ${ticketId} 已被拒絕，AI 動作未執行`);\n\nmsg.statusCode = 200;\nmsg.payload = `<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"><title>操作已拒絕</title></head>\n<body style=\"font-family:'Segoe UI',Arial,sans-serif;background:#f8f9fa;padding:40px;text-align:center;\">\n<div style=\"background:#fff;max-width:500px;margin:auto;padding:30px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.1);\">\n  <h2 style=\"color:#d93025;\">🚫 操作已拒絕</h2>\n  <p style=\"color:#5f6368;line-height:1.7;\">工單 <code>${ticketId}</code> 已被人工拒絕。<br>AI 提議的高危動作已取消，系統未執行任何操作。</p>\n  <a href=\"/api/hitl/dashboard\" style=\"display:inline-block;margin-top:16px;background:#4285f4;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:14px;\">← 返回審批中控台</a>\n</div>\n</body></html>`;\nreturn msg;",
+        "outputs": 1,
+        "libs": [],
+        "x": 500,
+        "y": 440,
+        "wires": [
+            [
+                "http_out_reject"
+            ]
+        ]
+    },
+    {
+        "id": "http_out_reject",
+        "type": "http response",
+        "z": "tab_day19",
+        "name": "回傳拒絕 HTML 頁面",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "text/html; charset=utf-8"
+        },
+        "x": 800,
+        "y": 440,
+        "wires": []
+    }
+]
