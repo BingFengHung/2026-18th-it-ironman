@@ -37,16 +37,16 @@
 
 ```
 【工單簽發支線】
-[高危動作觸發] ➔ 【1. 簽發防重放工單 (Function)】 ➔ [彈出 WinRT Toast（含中控台 URL）]
+[高危動作觸發] ➔ 【1. 簽發防重放工單】 ➔ [彈出 Windows 通知視窗]
 
 【審批核銷支線】
-[GET /api/action/approve] ➔ 【2. 驗證 Token、安全隔離與工單核銷 (Function)】 ➔ [HTTP 200 成功頁]
+[GET /api/action/approve] ➔ 【2. 驗證 Token、安全隔離與工單核銷】 ➔ [HTTP 200 成功頁面]
 
 【審批中控台支線】
-[GET /api/hitl/dashboard] ➔ 【3. 讀取 Flow Context 產生待審清單 HTML (Function)】 ➔ [互動式中控台頁面]
+[GET /api/hitl/dashboard] ➔ 【3. 讀取 Flow Context 產生待審清單 HTML】 ➔ [互動式中控台頁面]
 
 【拒絕端點支線】
-[GET /api/action/reject]  ➔ 【4. 刪除工單並核銷 (Function)】 ➔ [HTTP 200 拒絕確認頁]
+[GET /api/action/reject]  ➔ 【4. 刪除工單並核銷】 ➔ [HTTP 200 拒絕確認頁面]
 ```
 
 ---
@@ -65,8 +65,6 @@ pending[ticketId] = { plan, status: 'PENDING', expiresAt: Date.now() + 10 * 60 *
 flow.set('pending_tickets', pending);
 
 // 🔑 核心三：Toast 訊息直接嵌入審批中控台網址
-// ⚠️ 換行必須用 PowerShell 的 `n（反引號-n），不能用 JS 的 \n
-//    JS \n 是真實換行字元，嵌入單行 -Command 字串會斷行造成 error:1
 const dashUrl = 'http://127.0.0.1:1880/api/hitl/dashboard';
 const message = `檔案: ${safeFile} (${safeSize}MB)` + '`n' + `原因: ${safeReason}` + '`n' + `👉 審批中控台: ${dashUrl}`;
 
@@ -214,6 +212,6 @@ node.warn(`🚫 [人工拒絕] 工單 ${ticketId} 已被拒絕，AI 動作未執
 
 ## 今日總結與明日預告
 
-今天我們在 AI 自主行動的道路上加裝了最重要的保險絲——**Human-in-the-loop 審批門**。透過「防重放 Token + 10 分鐘 TTL + 隔離代硬刪」，讓工程師能在享受 AI 高效的同時，始終掌握系統最終主導權。
+今天我們在 AI 自主行動的道路上加裝了最重要的保險絲——**Human-in-the-loop 審批門**。透過「防重放 Token + 10 分鐘 TTL + 隔離代替硬刪」，讓工程師能在享受 AI 高效的同時，始終掌握系統最終主導權。
 
-* **明天（Day 20）**：我們將打造日常開發的小幫手——**智慧剪貼簿管家：複製代碼或報錯，AI 背景自動翻譯與秒級診斷**！
+* **明天（Day 20）**：我們將打造日常開發的小幫手——**智慧剪貼簿管家：複製程式碼或報錯，AI 背景自動翻譯與診斷**！
