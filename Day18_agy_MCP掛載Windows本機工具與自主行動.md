@@ -1,8 +1,8 @@
 # Day 18：自主行動：利用 agy MCP 掛載 Windows 本機工具與自主排查
 
-> 如果 AI 只能在對話框裡給你「文字建議」，最後去哪個資料夾翻日誌、查檔案、執行命令還是得由你手動一步步操作，那它頂多只是一個「顧問」，還稱不上真正的 **「自主行動 Agent（Autonomous Agent）」**。
-> 真正的質變在於：**當你給出一個目標（如「找出 Downloads 中 30 天未動的大檔案」），AI 能夠自己決定呼叫哪些 Windows 工具、自己讀取檔案、自己判斷資料、最後交出成果報告**！
-> 今天我們深入探索 **Model Context Protocol（MCP）**，利用 `agy mcp` 為本機 AI 掛載 Windows 工具，並結合 Day 14 的 **`🤖 agy 推理核心大腦`** Subflow 積木，實現高擴展性的自主調研工作流！
+> 如果 AI 只能在對話框裡給文字建議，查檔案與執行命令仍要由使用者手動完成，那它的角色就是提供建議。這篇會進一步說明工具掛載後的目標導向流程。
+> 這類流程的差異在於：使用者只需要提供目標，模型再依可用工具讀取資料並整理結果。工具權限與資料範圍仍需要先限制。
+> 今天會介紹 **Model Context Protocol（MCP）**，利用 `agy mcp` 掛載 Windows 工具，並結合 Day 14 的 **`🤖 agy 推理核心大腦`** Subflow，完成一個可延伸的目標導向流程。
 
 ---
 
@@ -128,7 +128,7 @@ agy mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem "$HOME\
 ![02](./image/day18/02.png)
 
 * **【成果解包與存檔】**：將 AI 彙整的多輪探勘結論解包為乾淨 Markdown，自動寫入 `~/DailyReports/` 目錄。
-* **【原生 WinRT 提醒】**：調用 PowerShell 原生 Toast 彈窗無感通知工程師（「🤖 MCP Agent 調研完成！」）。
+* **【原生 WinRT 提醒】**：呼叫 PowerShell 原生 Toast 彈窗通知使用者（「🤖 MCP Agent 調研完成」）。
 * **【零破壞防線】**：自主調研 Agent 僅具備建議權限，絕不自動物理刪除檔案，平滑銜接明日（Day 19）的 Human-in-the-loop 審批門！
 
 ---
@@ -171,12 +171,12 @@ return msg;
 
 ---
 
-### 步驟 2：調用專屬 AI 樂高積木（`🤖 agy 推理核心大腦` Subflow）
+### 步驟 2：調用共用 AI Subflow（`🤖 agy 推理核心大腦`）
 
 從左側「**AI 模組**」將 Day 14 打造的 **`🤖 agy 推理核心大腦`** 拖拉至畫布：
 
 * 自動銜接 Windows CLI 命令列。
-* 由於涉及多輪 MCP 工具調用，Subflow 內建的超時機制能保證長時間推理穩定運行。
+* 由於涉及多輪 MCP 工具呼叫，Subflow 內建逾時機制，避免單次任務長時間佔用流程。
 * 輸出端直接回傳 AI 彙整後的調研報告內容。
 
 > **💡 原理解析**：
@@ -252,6 +252,6 @@ return msg;
 
 ## 今日總結與明日預告
 
-今天我們突破了單向問答的框架，利用 `agy mcp` 為本機 AI 掛載了真實的本機檔案操作能力，並透過 Day 14 的 Subflow 樂高積木實現了高擴展性的目標導向自主探索。
+今天說明了如何用 `agy mcp` 掛載本機檔案工具，讓模型依目標讀取資料並產生報告；實際可執行的操作仍取決於 MCP 工具的權限設定。
 
-* **明天（Day 19）**：當 AI 具備自主行動力時，如何防止它誤刪關鍵檔案？——**Human-in-the-loop 審批門：高危 AI 動作 Toast 確認與安全放行機制**！
+* **明天（Day 19）**：接著處理 AI 可能執行高風險操作的情況，加入 Human-in-the-loop 審批流程。

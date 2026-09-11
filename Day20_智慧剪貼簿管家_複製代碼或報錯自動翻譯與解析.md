@@ -124,9 +124,9 @@ return msg;
 
 ---
 
-### 步驟 3：調用專屬 AI 樂高積木（`🤖 agy 推理核心大腦` Subflow）
+### 步驟 3：調用共用 AI Subflow（`🤖 agy 推理核心大腦`）
 
-從左側「**AI 模組**」拖入 Day 14 封裝完成的 **`🤖 agy 推理核心大腦`**，接在步驟 2 後方即可。Subflow 內部已自體完成引號跳脫、CLI 呼叫與結構化雙軌解包（詳見 [Day 14](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day14_打造專屬Subflow樂高積木_封裝agy推理核心節點.md)），輸出端直接傳出含有 `content_type`、`summary_zh`、`action_suggestion` 的純淨物件。
+從左側「**AI 模組**」拖入 Day 14 封裝完成的 **`🤖 agy 推理核心大腦`**，接在步驟 2 後方即可。Subflow 內部集中處理引號跳脫、CLI 呼叫與結構化結果解析（詳見 [Day 14](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day14_打造專屬Subflow樂高積木_封裝agy推理核心節點.md)），輸出端會傳出 `content_type`、`summary_zh`、`action_suggestion` 等欄位。
 
 > **💡 重複使用 Subflow**：其他 Flow 只要傳入 `msg.prompt`，也可以選擇傳入 `msg.schema`。這樣可以沿用 Day 14 的跳脫與結果解析邏輯，避免每個案例都重新實作一次。
 

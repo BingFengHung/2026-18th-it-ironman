@@ -2,7 +2,7 @@
 
 > 當 Windows 上的某個軟體（如 VS Code、Docker、Node.js 服務或大型遊戲）突然無預警閃退或崩潰時，Windows 事件檢視器（Event Viewer）通常會在背後默默寫入一條 `Event ID 1000 (Application Error)`。
 > 但當你滿懷期待打開事件檢視器，映入眼簾的卻是滿滿晦澀的十六進位代碼（如 `0xc0000005`）與故障模組（如 `ntdll.dll`），完全不知道到底是記憶體問題、驅動衝突還是外掛崩潰。
-> 今天我們結合 Day 14 的 **`🤖 agy 推理核心大腦`** Subflow 積木，打造 Windows 崩潰守護中樞：**定時自動捕獲最新 Application Error ➔ 由本機 AI 深度解讀堆疊 ➔ 依嚴重等級（CRITICAL / WARNING / NORMAL）進行智慧三路分流與自動自癒**！
+> 今天會結合 Day 14 的 **`🤖 agy 推理核心大腦`** Subflow，定時取得最新的 Application Error，再依嚴重等級（CRITICAL / WARNING / NORMAL）分流處理。
 
 ---
 
@@ -75,8 +75,8 @@ Faulting application path: %USERPROFILE%\AppData\Local\Programs\Microsoft VS Cod
 > **💡 原理解析：為什麼必須用 try-catch 包裹而不是只用 -ErrorAction SilentlyContinue？**
 >
 > 1. **避免 Exec 節點虛驚報錯（Exit Code 0）**：在 Windows PowerShell 中，當過去 30 分鐘系統健康無任何崩潰時，`Get-WinEvent` 會因查無紀錄拋出非終止例外。即使加上 `-ErrorAction SilentlyContinue` 隱藏報錯文字，PowerShell 終止時的行程結束代碼仍為 `1`，會導致 Node-RED 的 Exec 節點下方懸掛紅色的 `error: 1` 徽章造成誤判。
-> 2. **優雅降級空陣列**：透過 `try-catch` 捕捉「查無事件」例外並主動輸出標準的合法空 JSON 陣列 `'[]'`，既能讓 PowerShell 以 Exit Code 0 正常退出，又能讓下游過濾節點無縫識別並亮出綠燈「系統穩定無崩潰」！
-> 3. **極致輕量取證**：透過 `FilterHashtable` 直接由 Windows 核心事件日誌引擎在底層完成過濾，耗時不到 50ms，且設定 `StartTime` 為最近 30 分鐘，避免無謂地遍歷數百 MB 的歷史舊日誌。
+> 2. **空結果處理**：透過 `try-catch` 捕捉「查無事件」例外並輸出空 JSON 陣列 `'[]'`，讓 PowerShell 正常結束，下游也能依空陣列判斷目前沒有新事件。
+> 3. **限制查詢範圍**：透過 `FilterHashtable` 與 `StartTime` 只查詢最近 30 分鐘，避免每次掃描整份歷史日誌。
 
 ---
 
@@ -255,6 +255,6 @@ Windows 桌面右下角將立刻彈出紅色警告 Toast，明確提示原因與
 
 ## 今日總結與明日預告
 
-今天我們打通了 Windows 原生 Event Viewer 的監聽能力，並透過 Day 14 的 Subflow 樂高積木，用極致清爽的節點流完成了「十六進位崩潰排查 ➔ 嚴重度三路分流 ➔ 差異化閉環處置」。
+今天串接了 Windows 原生 Event Viewer 的事件取得、錯誤去重、AI 分析與嚴重度分流。
 
-* **明天（Day 18）**：我們將探索如何賦予本機 AI 真正的四肢——**agy MCP 掛載 Windows 本機工具與自主行動 Agent**！
+* **明天（Day 18）**：接著介紹 `agy MCP` 如何掛載 Windows 本機工具，讓模型依任務讀取資料。

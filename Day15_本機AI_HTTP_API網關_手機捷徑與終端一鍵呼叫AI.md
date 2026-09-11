@@ -1,7 +1,7 @@
 # Day 15：本機 API：本機 AI HTTP API 網關（手機捷徑與終端一鍵呼叫 AI）
 
 > 平常坐在電腦前可以用終端機呼叫 `agy.exe`，但如果我們想「在 iPhone / Android 手機上按一下捷徑、或是從區域網路的另一台筆電發送請求」來使用家裡這台電腦強大的本機 AI 呢？
-> 今天我們結合昨天（Day 14）打造完成的 **`🤖 agy 推理核心大腦`** Subflow 樂高積木，搭配 Node-RED 的 `http in` 與 `http response` 節點，把電腦打造成一台 **「本機專屬 AI HTTP API 網關」**，支援同步 200 回應與非同步 202 快速回執！
+> 今天會沿用 Day 14 的 **`🤖 agy 推理核心大腦`** Subflow，搭配 Node-RED 的 `http in` 與 `http response` 節點，建立一個本機 HTTP API。文章會比較同步 200 回應與非同步 202 回應的使用情境。
 
 ---
 
@@ -90,13 +90,13 @@ return msg;
 * **Headers**：`content-type: application/json; charset=utf-8`
 
 > **🔑 重點說明**：
-> 經過 Subflow 雙軌解包防禦後，此節點保證能拿到最純淨的 AI 答案，下游只需專注將其包裝為包含狀態碼（`status`）、時間戳記（`timestamp`）與解答（`answer`）的標準 RESTful API 回應契約。
+> Subflow 完成雙軌解包後，下游可以將結果包裝成包含狀態碼（`status`）、時間戳記（`timestamp`）與解答（`answer`）的 RESTful API 回應。
 
 ---
 
 ### 模式 B 實作：非同步長任務秒回（`POST /api/ai/async`）
 
-在面臨大量請求、批次自動化呼叫，或是耗時數十秒的重度分析時，若讓客戶端保持長連線等待，極易遭遇 iOS 捷徑 30 秒超時或網路瞬斷錯誤。我們利用 Node-RED 的「雙分岔（Forking）」機制，實現秒級回執與背景排程：
+在面臨大量請求、批次自動化呼叫，或是需要較長時間的分析時，若讓客戶端保持長連線等待，可能遭遇 iOS 捷徑逾時或網路中斷。我們利用 Node-RED 的「雙分岔（Forking）」機制，先回傳工作編號，再讓背景流程繼續處理：
 
 #### 步驟 1：開放非同步端點（`http in` 節點）
 
@@ -127,7 +127,7 @@ return msg;
 後方直接連至 **`http response`** 節點（設定狀態碼為 `202`）。
 
 > **💡 原理解析：為什麼能夠 0.1 秒回覆？**
-> 當 HTTP 伺服器節點收到請求時，分岔出的這條線路僅進行記憶體內的欄位賦值與工單編號產製，隨即送入 `http response` 觸發回應。TCP 連線在 0.1 秒內便完成握手關閉，客戶端立刻取得 `job_id` 回執，徹底根絕終端逾時崩潰！
+> 當 HTTP 伺服器節點收到請求時，這條分支先建立工作編號並送入 `http response`，讓客戶端不用等待完整分析結果。實際回應時間仍取決於本機服務與網路狀態。
 
 #### 步驟 3：軌道 B——背景深潛推理與結果通知
 
@@ -211,7 +211,7 @@ Write-Host "AI 回應: $($res.answer)" -ForegroundColor Green
 ![1788729414712](./image/day15/03.png)
 ![1788729315034](./image/day15/04.png)
 
-點擊桌面小工具、捷徑圖示或透過 Siri 語音呼叫，手機即可彈出動態輸入框，輸入後秒級連動本機電腦進行 AI 智慧問答，並直接呈現乾淨純粹的中文回答！
+點擊桌面小工具、捷徑圖示或透過 Siri 語音呼叫後，手機會顯示輸入框，再把內容送到本機電腦處理。
 
 ### ⚡ 方式 3：大量非同步請求與長任務呼叫（202 Accepted 快速回執）
 
@@ -259,7 +259,7 @@ Write-Host "伺服器回執: $($res.message)" -ForegroundColor Green
 
 ## 完整 Flow 程式
 
-本篇包含完整的 `http in` 端點、Day 14 `🤖 agy 推理核心大腦` Subflow 積木與 `http response` 契約封裝，已完整包裝為 Flow 檔案，在 Node-RED 點擊「右上角漢堡選單」➔「匯入」即可一鍵部署：
+本篇包含完整的 `http in` 端點、Day 14 `🤖 agy 推理核心大腦` Subflow 積木與 `http response` 契約封裝，已完整包裝為 Flow 檔案，在 Node-RED 點擊「右上角選單」➔「匯入」即可一鍵部署：
 
 ### 本範例 flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day15_http_api_gateway.json)
 
@@ -271,6 +271,6 @@ Write-Host "伺服器回執: $($res.message)" -ForegroundColor Green
 
 ## 今日總結與明日預告
 
-今天我們把封閉在電腦終端機裡的本機 AI 解放出來，透過 Node-RED 打造出輕量、跨裝置的 **本機 HTTP API 網關**，讓手機捷徑與區域網路設備都能一鍵調度強大的本機模型。
+今天將原本只能從終端機呼叫的本機 AI 接成 HTTP API，讓手機捷徑與區域網路設備可以送出請求。
 
-* **明天（Day 16）**：我們將迎來第一階段的集大成驗收——**5 分鐘組裝一條具備記憶、AI 決策與 Toast 彈窗的 Windows 智慧守護流水線**！
+* **明天（Day 16）**：接著整合前 15 天的記憶、AI 判斷與通知流程，完成第一階段的整合範例。
