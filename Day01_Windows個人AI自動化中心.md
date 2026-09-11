@@ -2,7 +2,7 @@
 
 > 身為一個 Windows 使用者或開發者，一定有寫過 `.bat` 或是 `.ps1` 腳本，或是用「Windows 工作排程器」定期的去執行某個程式。
 > 本系列想透過 **Node-RED** 這套工具搭配 Google 的 **`agy cli`**，來改善 Windows 自動化工作流程。
-> 今天將深入剖析這兩大工具，為你的 Windows 電腦加入 AI 管家幫你自動完成工作！
+> 今天將介紹這兩大工具，說明它們如何串接 Windows 自動化工作流程。
 
 ---
 
@@ -42,7 +42,7 @@ Node-RED 是一套 Low Code 的平台，主要透過 JavaScript 進行程式碼�
   * **常駐記憶體**：僅約 **35 MB ~ 60 MB RAM**！
   * **CPU 閒置佔用**：**0.0% ~ 0.1%**（採用 Node.js 非阻塞事件迴圈，沒有事件進線時執行緒直接休眠）。
   * **啟動速度**：在 Windows 10/11 上冷啟動僅需 **0.8 ~ 1.5 秒**。
-* **結論**：相較於隨便開一個 Chrome 分頁（150MB~300MB），Node-RED 常駐在 Windows 背景基本上是「完全無感」的存在。
+* **結論**：相較於另外開啟瀏覽器分頁，Node-RED 可以常駐在 Windows 背景執行；實際資源使用量仍會依流程與排程而變化。
 
 ---
 
@@ -79,7 +79,7 @@ Node-RED 是一套 Low Code 的平台，主要透過 JavaScript 進行程式碼�
 #### 分工原則：
 
 * **PowerShell 專注當「手腳」**：只寫 1~3 行最精準的 Windows 底層操作（如 `Get-Process | ConvertTo-Json`、`Move-Item`、WMI 查詢）。
-* **Node-RED 專注當「大腦與骨架」**：負責排程、非同步事件、狀態記憶（Context/SQLite）、流程分流、防抖限流、調度 `agy.exe` AI 核心與系統通知。
+* **Node-RED 負責流程編排**：處理排程、非同步事件、狀態記憶（Context/SQLite）、流程分流、防抖限流、`agy.exe` 調度與系統通知。
 
 ---
 
@@ -92,7 +92,7 @@ Node-RED 是一套 Low Code 的平台，主要透過 JavaScript 進行程式碼�
 1. **第 0 階段（Day 01–03）｜Windows 自動化基石**：
    - 打通 Windows 本機 Node-RED 視覺化環境、Context 狀態記憶模型與 Google `agy.exe` 免 API Key 終端機大腦。
 2. **第 1 階段（Day 04–08）｜本機 AI 效率場景大爆發**：
-   - **從第 4 天直接進入 AI 實戰！**：Downloads 混亂檔案 AI 智慧分類、終端機報錯一鍵救援、剪貼簿非結構文字轉 Markdown 表格、Git 工作日報自動產出、電腦卡頓秒級 RCA 根因診斷。
+   - **從第 4 天開始進入 AI 實作**：Downloads 檔案分類、終端機錯誤分析、剪貼簿表格化、Git 工作日報與電腦負載 RCA。
 3. **第 2 階段（Day 09–16）｜讓本機 AI 變聰明、變穩定**：
    - `--json-schema` 契約保證、Prompt 前置資料壓縮、本機 SQLite 長期記憶（Agentic Text-to-SQL 動態檢索）、雙層防誤刪安全網、防重複安全防呆鎖、封裝 `agy-ai-core` 專屬 Subflow、本機 HTTP API 網關與第一階段守護流水線綜合驗收。
 4. **第 3 階段（Day 17–22）｜AI Agent 自主行動力與進階排查**：
@@ -100,6 +100,6 @@ Node-RED 是一套 Low Code 的平台，主要透過 JavaScript 進行程式碼�
 5. **第 4 階段（Day 23–28）｜【Windows 智慧總管家】端到端整合實戰**：
    - 四層架構端到端拼裝、雙軌採集、AI 雙軌決策大腦、多管道推播歸檔、全系統並行防護與全流程自我修復。
 6. **第 5 階段（Day 29–30）｜生產上線與維運藍圖**：
-   - 專注使用 PM2 實現開機無感自啟與守護、30 天復盤與個人 AI Agent 未來藍圖。
+   - 使用 PM2 實現開機自動啟動與程序守護，並整理 30 天復盤與個人 AI Agent 的後續方向。
 
 明天我們將從 Windows 本機 Node-RED 環境搭建與 Context 記憶機制說明開始！
