@@ -9,7 +9,7 @@
 
 ## 在 Windows 上安裝與啟動 Node-RED
 
-在 Windows 上安裝 Node-RED 非常簡單，跟著這 4 個步驟走就行：
+在 Windows 上安裝 Node-RED 可以分成以下 4 個步驟：
 
 ### 步驟 1：安裝 Node.js LTS 環境
 
@@ -175,7 +175,9 @@ msg.payload = {
 return msg;
 ```
 
-## 完整 Flow 程式
+## 完整 Flow
+
+完整 Flow 已整理至獨立檔案，可下載後在 Node-RED 中匯入：
 
 ### 本範例 flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day02_nodered_context.json)
 
@@ -197,4 +199,4 @@ return msg;
 
 今天我們順利把 Node-RED 架設在 Windows 本機上，並且搞懂了讓管家具備記憶能力的 Context 模型。
 
-* **明天（Day 03）**：我們將介紹 **Google `agy CLI`**！
+* **明天（Day 03）**：接著介紹 **Google `agy CLI`**。
