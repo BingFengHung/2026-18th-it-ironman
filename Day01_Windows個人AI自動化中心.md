@@ -94,11 +94,11 @@ Node-RED 是一套 Low Code 的平台，主要透過 JavaScript 進行程式碼�
 2. **第 1 階段（Day 04–08）｜本機 AI 效率場景大爆發**：
    - **從第 4 天開始進入 AI 實作**：Downloads 檔案分類、終端機錯誤分析、剪貼簿表格化、Git 工作日報與電腦負載 RCA。
 3. **第 2 階段（Day 09–16）｜讓本機 AI 變聰明、變穩定**：
-   - `--json-schema` 契約保證、Prompt 前置資料壓縮、本機 SQLite 長期記憶（Agentic Text-to-SQL 動態檢索）、雙層防誤刪安全網、防重複安全防呆鎖、封裝 `agy-ai-core` 專屬 Subflow、本機 HTTP API 網關與第一階段守護流水線綜合驗收。
-4. **第 3 階段（Day 17–22）｜AI Agent 自主行動力與進階排查**：
+   - `--json-schema` 契約保證、Prompt 前置資料壓縮、本機 SQLite 長期記憶（Agentic Text-to-SQL 動態檢索）、雙層防誤刪安全網、防重複安全防呆鎖、封裝 `agy-ai-core` 專屬 Subflow、本機 HTTP API 網關與本階段守護流水線整合驗收。
+4. **第 3 階段（Day 17–22）｜AI Agent 能力、安全與執行控制**：
    - Event Viewer 崩潰日誌深度分流、`agy mcp` 掛載 Windows 本機工具、Human-in-the-loop 審批門、智慧剪貼簿管家、Semaphore 號誌燈並行保護與 MD5 特徵快取。
-5. **第 4 階段（Day 23–28）｜【Windows 智慧總管家】端到端整合實戰**：
-   - 四層架構端到端拼裝、雙軌採集、AI 雙軌決策大腦、多管道推播歸檔、全系統並行防護與全流程自我修復。
+5. **第 4 階段（Day 23–28）｜Windows AI 自動化系統端到端整合實戰**：
+   - 五層架構端到端拼裝、雙軌採集、AI 任務路由、多管道推播歸檔、全系統並行防護與錯誤退避處理。
 6. **第 5 階段（Day 29–30）｜生產上線與維運藍圖**：
    - 使用 PM2 實現開機自動啟動與程序守護，並整理 30 天復盤與個人 AI Agent 的後續方向。
 
