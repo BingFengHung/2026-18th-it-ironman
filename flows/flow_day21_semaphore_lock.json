@@ -1,0 +1,214 @@
+[
+  {
+    "id": "tab_day21",
+    "type": "tab",
+    "label": "Day 21 - Semaphore 並行號誌鎖",
+    "disabled": false
+  },
+  {
+    "id": "subflow_day21_agy",
+    "type": "subflow",
+    "name": "🤖 agy 推理核心大腦",
+    "info": "沿用 Day 14 的共用 agy 推理模組，包含 JSON Schema 契約與雙軌解包；第 2 輸出代表執行失敗。",
+    "category": "AI 模組",
+    "in": [{ "x": 60, "y": 80, "wires": [{ "id": "fn_day21_agy_command" }] }],
+    "out": [
+      { "x": 780, "y": 80, "wires": [{ "id": "fn_day21_agy_unpack", "port": 0 }] },
+      { "x": 780, "y": 140, "wires": [{ "id": "fn_day21_agy_error", "port": 0 }] }
+    ],
+    "env": [],
+    "meta": {},
+    "color": "#DDAA99"
+  },
+  {
+    "id": "fn_day21_agy_command",
+    "type": "function",
+    "z": "subflow_day21_agy",
+    "name": "1. 建立 agy 指令",
+    "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\n\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\n\nmsg.payload = cmd;\nreturn msg;",
+    "outputs": 1,
+    "x": 220,
+    "y": 80,
+    "wires": [["exec_day21_agy"]]
+  },
+  {
+    "id": "exec_day21_agy",
+    "type": "exec",
+    "z": "subflow_day21_agy",
+    "command": "",
+    "addpay": "payload",
+    "append": "",
+    "useSpawn": "false",
+    "timer": "120",
+    "winHide": false,
+    "oldrc": false,
+    "name": "2. 呼叫 agy.exe",
+    "x": 420,
+    "y": 80,
+    "wires": [["fn_day21_agy_unpack"], [], ["fn_day21_agy_exit"]]
+  },
+  {
+    "id": "fn_day21_agy_exit",
+    "type": "function",
+    "z": "subflow_day21_agy",
+    "name": "檢查 agy 結束碼",
+    "func": "const rc = typeof msg.rc === 'object' && msg.rc !== null ? Number(msg.rc.code) : Number(msg.rc);\nif (rc === 0) {\n    return null;\n}\n\nmsg.aiError = true;\nmsg.payload = msg.payload || `agy 結束碼 ${rc}`;\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 200,
+    "wires": [["fn_day21_agy_error"]]
+  },
+  {
+    "id": "fn_day21_agy_unpack",
+    "type": "function",
+    "z": "subflow_day21_agy",
+    "name": "3. 雙軌解包",
+    "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\n\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\n\nmsg.payload = result || parsed;\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 80,
+    "wires": [[]]
+  },
+  {
+    "id": "fn_day21_agy_error",
+    "type": "function",
+    "z": "subflow_day21_agy",
+    "name": "agy 執行失敗",
+    "func": "msg.aiError = true;\nmsg.payload = msg.payload || msg.rc || 'agy 執行失敗';\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 140,
+    "wires": [[]]
+  },
+  {
+    "id": "inj_day21_req1",
+    "type": "inject",
+    "z": "tab_day21",
+    "name": "並行請求 1 (模擬高負載排程)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "Task-1",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 160,
+    "y": 100,
+    "wires": [
+      [
+        "fn_day21_acquire"
+      ]
+    ]
+  },
+  {
+    "id": "inj_day21_req2",
+    "type": "inject",
+    "z": "tab_day21",
+    "name": "並行請求 2 (瞬間湧入)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "Task-2",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 160,
+    "y": 160,
+    "wires": [
+      [
+        "fn_day21_acquire"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day21_acquire",
+    "type": "function",
+    "z": "tab_day21",
+    "name": "1. 獲取 Semaphore 號誌鎖 (Function)",
+    "func": "// 設定最大允許並行數 MAX_CONCURRENCY = 1 (保護 CPU 不被多個 agy.exe 塞爆)\nconst MAX_CONCURRENCY = 1;\nlet activeCount = flow.get('active_ai_count') || 0;\n\nif (activeCount >= MAX_CONCURRENCY) {\n    node.warn(`🛑 [號誌鎖攔截] 當前已有 ${activeCount} 個 AI 任務執行中，任務 ${msg.payload} 進入降級處理！`);\n    msg.status = 'THROTTLED';\n    return [null, msg]; // 第 2 路: 降級處理\n}\n\n// 取得鎖，計數 +1，並為本次任務建立一次性 token\nactiveCount++;\nconst token = `sem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;\nconst activeTokens = flow.get('active_ai_tokens') || {};\nactiveTokens[token] = true;\nflow.set('active_ai_count', activeCount);\nflow.set('active_ai_tokens', activeTokens);\nmsg.semaphore_token = token;\nnode.status({ fill: 'green', shape: 'dot', text: `執行中 (${activeCount}/${MAX_CONCURRENCY})` });\n\nmsg.status = 'ACQUIRED';\nreturn [msg, null]; // 第 1 路: 正常放行進入 AI",
+    "outputs": 2,
+    "x": 460,
+    "y": 130,
+    "wires": [
+      [
+        "fn_day21_build_prompt"
+      ],
+      [
+        "dbg_day21_throttled"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day21_build_prompt",
+    "type": "function",
+    "z": "tab_day21",
+    "name": "2. 準備 Prompt 與 Schema",
+    "func": "msg.prompt = `請簡要說明為什麼本機自動化需要控制 AI 並行數（任務：${msg.payload}）`;\nmsg.schema = {\n  type: 'object',\n  properties: {\n    explanation: { type: 'string', description: '並行控制的白話說明' }\n  },\n  required: ['explanation']\n};\nreturn msg;",
+    "outputs": 1,
+    "x": 730,
+    "y": 100,
+    "wires": [
+      [
+        "subflow_day21_agy_instance"
+      ]
+    ]
+  },
+  {
+    "id": "subflow_day21_agy_instance",
+    "type": "subflow:subflow_day21_agy",
+    "z": "tab_day21",
+    "name": "3. 🤖 agy 推理核心大腦",
+    "x": 950,
+    "y": 100,
+    "wires": [
+      [
+        "fn_day21_release"
+      ],
+      [
+        "fn_day21_release"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day21_release",
+    "type": "function",
+    "z": "tab_day21",
+    "name": "4. 釋放 Semaphore 號誌鎖（成功或失敗）",
+    "func": "const token = msg.semaphore_token;\nconst activeTokens = flow.get('active_ai_tokens') || {};\n\n// 同一個任務可能因 stdout 分段或多個輸出路徑重複抵達；只允許第一次 Release。\nif (!token || !activeTokens[token]) {\n    node.warn('⚠️ [Semaphore 防重複] 此訊息已釋放過名額，忽略重複 Release。');\n    return null;\n}\n\ndelete activeTokens[token];\nlet activeCount = flow.get('active_ai_count') || 1;\nactiveCount = Math.max(0, activeCount - 1);\nflow.set('active_ai_count', activeCount);\nflow.set('active_ai_tokens', activeTokens);\nmsg.active_ai_count = activeCount;\n\nnode.status({ fill: 'blue', shape: 'ring', text: `已釋放鎖 (剩餘 ${activeCount})` });\nreturn msg;",
+    "outputs": 1,
+    "x": 1210,
+    "y": 100,
+    "wires": [
+      [
+        "dbg_day21_result"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day21_result",
+    "type": "debug",
+    "z": "tab_day21",
+    "name": "AI 任務完成（含錯誤）",
+    "active": true,
+    "tosidebar": true,
+    "complete": "active_ai_count",
+    "targetType": "msg",
+    "x": 1450,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "dbg_day21_throttled",
+    "type": "debug",
+    "z": "tab_day21",
+    "name": "⚠️ 降級排隊任務",
+    "active": true,
+    "x": 740,
+    "y": 180,
+    "wires": []
+  }
+]
