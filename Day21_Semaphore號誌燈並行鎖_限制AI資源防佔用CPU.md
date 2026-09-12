@@ -5,6 +5,8 @@
 
 ---
 
+本文同步發布於 GitHub： [2026-18th-it-ironman](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/Day21_Semaphore號誌燈並行鎖_限制AI資源防佔用CPU.md)
+
 ## 為什麼需要 Semaphore 並行控制？
 
 | 比較項目                   | ❌ 無並行限制                    | ✅ 使用 Semaphore 號誌機制                 |
