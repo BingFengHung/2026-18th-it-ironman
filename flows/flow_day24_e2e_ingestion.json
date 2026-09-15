@@ -1,0 +1,90 @@
+[
+  {
+    "id": "tab_day24",
+    "type": "tab",
+    "label": "Day 24 - E2E 實戰層1：採集與清洗",
+    "disabled": false
+  },
+  {
+    "id": "inj_day24_scan",
+    "type": "inject",
+    "z": "tab_day24",
+    "name": "定時 2 分鐘採集 (或點擊)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "120",
+    "once": true,
+    "onceDelay": 2,
+    "x": 160,
+    "y": 100,
+    "wires": [
+      [
+        "fn_day24_collect_metrics"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day24_collect_metrics",
+    "type": "function",
+    "z": "tab_day24",
+    "name": "1. 採集記憶體與下載區現況 (Function)",
+    "func": "const total = os.totalmem();\nconst free = os.freemem();\nconst used = total - free;\nconst memPercent = Math.round((used / total) * 100);\nconst homedir = os.homedir();\nconst dlDir = path.join(homedir, 'Downloads');\nlet pendingFiles = [];\nlet sourceError = null;\n\ntry {\n    if (fs.existsSync(dlDir)) {\n        pendingFiles = fs.readdirSync(dlDir)\n            .filter(name => !name.startsWith('.') && !name.endsWith('.crdownload'))\n            .map(name => {\n                const fullPath = path.join(dlDir, name);\n                const stat = fs.statSync(fullPath);\n                return stat.isFile() ? { filename: name, path: fullPath, size_bytes: stat.size, modified_at: stat.mtime.toISOString(), stable: true } : null;\n            })\n            .filter(Boolean).slice(0, 5);\n    }\n} catch (err) { sourceError = err.message; }\n\nmsg.payload = {\n    task_id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,\n    task_type: 'CLASSIFY_FILE',\n    source: 'DAY24_INGESTION',\n    input: {\n        collected_at: new Date().toISOString(),\n        download_dir: dlDir,\n        metrics: { mem_percent: memPercent, is_heavy: memPercent > 80 },\n        files: pendingFiles,\n        source_error: sourceError\n    }\n};\nreturn msg;",
+    "outputs": 1,
+    "libs": [
+      {
+        "var": "os",
+        "module": "os"
+      },
+      {
+        "var": "fs",
+        "module": "fs"
+      },
+      {
+        "var": "path",
+        "module": "path"
+      }
+    ],
+    "x": 480,
+    "y": 100,
+    "wires": [
+      [
+        "ch_day24_jsonata"
+      ]
+    ]
+  },
+  {
+    "id": "ch_day24_jsonata",
+    "type": "change",
+    "z": "tab_day24",
+    "name": "2. JSONata 前置標準化清洗 (Change)",
+    "rules": [
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "{\n  \"task_id\": payload.task_id,\n  \"task_type\": payload.task_type,\n  \"source\": payload.source,\n  \"input\": {\n    \"collected_at\": payload.input.collected_at,\n    \"download_dir\": payload.input.download_dir,\n    \"metrics\": payload.input.metrics,\n    \"file_count\": $count(payload.input.files),\n    \"files\": payload.input.files,\n    \"source_error\": payload.input.source_error\n  }\n}",
+        "tot": "jsonata"
+      }
+    ],
+    "x": 820,
+    "y": 100,
+    "wires": [
+      [
+      "dbg_day24_out"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day24_out",
+    "type": "debug",
+    "z": "tab_day24",
+    "name": "清洗後標準化 Task Envelope",
+    "active": true,
+    "x": 1100,
+    "y": 100,
+    "wires": []
+  }
+]
