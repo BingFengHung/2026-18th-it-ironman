@@ -1,0 +1,85 @@
+[
+  {
+    "id": "tab_day26",
+    "type": "tab",
+    "label": "Day 26 - E2E 實戰層3：執行與審計",
+    "disabled": false
+  },
+  {
+    "id": "inj_day26_action",
+    "type": "inject",
+    "z": "tab_day26",
+    "name": "接收 AI 決策指令 (分類檔案到 Installers)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"action\":\"MOVE_FILE\",\"filename\":\"Docker_Installer.exe\",\"category\":\"Installers\"}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 200,
+    "y": 100,
+    "wires": [
+      [
+        "fn_day26_execute_audit"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day26_execute_audit",
+    "type": "function",
+    "z": "tab_day26",
+    "name": "1. 安全搬移、持久化審計與 Toast (Function)",
+    "func": "let data;\ntry { data = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch (err) { data = {}; }\nconst homedir = os.homedir();\nconst base = path.resolve(path.join(homedir, 'Downloads'));\nconst allowed = ['Installers','Documents','Archives','Media','Others'];\nconst category = allowed.includes(data.category) ? data.category : null;\nconst filename = path.basename(String(data.filename || ''));\nconst source = path.resolve(path.join(base, filename));\nconst target = category ? path.resolve(path.join(base, category, filename)) : null;\nlet status = 'REJECTED';\nlet error = null;\n\nif (!category) error = '分類不在白名單';\nelse if (!filename || filename === '.' || filename === '..') error = '缺少檔名';\nelse if (!source.startsWith(base + path.sep) || !target.startsWith(base + path.sep)) error = '路徑越界';\nelse if (!fs.existsSync(source) || !fs.statSync(source).isFile()) { status = 'SKIPPED'; error = '來源檔案不存在'; }\nelse {\n    try { fs.mkdirSync(path.dirname(target), { recursive: true }); if (source !== target) fs.renameSync(source, target); status = 'SUCCESS'; }\n    catch (err) { status = 'FAILED'; error = err.message; }\n}\n\nconst auditDir = path.join(homedir, 'SystemLogs');\nfs.mkdirSync(auditDir, { recursive: true });\nconst audit = { task_id: data.task_id || null, timestamp: new Date().toISOString(), action: 'MOVE_FILE', status, source, target, category, error };\nfs.appendFileSync(path.join(auditDir, 'audit_trail.log'), JSON.stringify(audit) + '\\n', 'utf-8');\nmsg.auditStatus = status;\nmsg.audit = audit;\nconst title = status === 'SUCCESS' ? '📂 [E2E 管家] 歸檔完成' : '🛡️ [E2E 管家] 動作未執行';\nconst message = `${status}: ${error || filename}`.replace(/[\\r\\n]+/g, ' ');\nmsg.payload = `powershell -NoProfile -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName('text'); $textNodes.Item(0).AppendChild($template.CreateTextNode('${title}')) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode('${message}')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Windows AI 管家').Show([Windows.UI.Notifications.ToastNotification]::new($template));\"`;\nreturn msg;",
+    "outputs": 1,
+    "libs": [
+      {
+        "var": "os",
+        "module": "os"
+      },
+      {
+        "var": "fs",
+        "module": "fs"
+      },
+      {
+        "var": "path",
+        "module": "path"
+      }
+    ],
+    "x": 580,
+    "y": 100,
+    "wires": [
+      [
+        "exec_day26_toast",
+        "dbg_day26_audit"
+      ]
+    ]
+  },
+  {
+    "id": "exec_day26_toast",
+    "type": "exec",
+    "z": "tab_day26",
+    "command": "",
+    "addpay": true,
+    "name": "2. Windows Toast (Exec)",
+    "x": 920,
+    "y": 80,
+    "wires": [
+      [],
+      [],
+      []
+    ]
+  },
+  {
+    "id": "dbg_day26_audit",
+    "type": "debug",
+    "z": "tab_day26",
+    "name": "審計已記錄",
+    "active": true,
+    "x": 890,
+    "y": 140,
+    "wires": []
+  }
+]

@@ -1,0 +1,128 @@
+[
+  {
+    "id": "tab_day25",
+    "type": "tab",
+    "label": "Day 25 - E2E 實戰層2：AI 決策大腦",
+    "disabled": false
+  },
+  {
+    "id": "subflow_day25_agy",
+    "type": "subflow",
+    "name": "🤖 agy 推理核心大腦",
+    "info": "沿用 Day 14 共用 Subflow，集中處理 agy CLI 呼叫、Schema 與雙軌解包。",
+    "category": "AI 模組",
+    "in": [{ "x": 60, "y": 80, "wires": [{ "id": "fn_day25_agy_command" }] }],
+    "out": [{ "x": 780, "y": 80, "wires": [{ "id": "fn_day25_agy_unpack", "port": 0 }] }],
+    "env": [],
+    "meta": {},
+    "color": "#DDAA99"
+  },
+  {
+    "id": "fn_day25_agy_command",
+    "type": "function",
+    "z": "subflow_day25_agy",
+    "name": "1. 建立 agy 指令",
+    "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\nmsg.payload = cmd;\nreturn msg;",
+    "outputs": 1,
+    "x": 220,
+    "y": 80,
+    "wires": [["exec_day25_agy"]]
+  },
+  {
+    "id": "exec_day25_agy",
+    "type": "exec",
+    "z": "subflow_day25_agy",
+    "command": "",
+    "addpay": "payload",
+    "append": "",
+    "useSpawn": "false",
+    "timer": "120",
+    "winHide": false,
+    "oldrc": false,
+    "name": "2. 呼叫 agy.exe",
+    "x": 420,
+    "y": 80,
+    "wires": [["fn_day25_agy_unpack"], [], []]
+  },
+  {
+    "id": "fn_day25_agy_unpack",
+    "type": "function",
+    "z": "subflow_day25_agy",
+    "name": "3. 雙軌解包",
+    "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try { result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response; } catch (e) { result = parsed.response; }\n}\nmsg.payload = result || parsed;\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 80,
+    "wires": [[]]
+  },
+  {
+    "id": "inj_day25_task",
+    "type": "inject",
+    "z": "tab_day25",
+    "name": "模擬輸入下載區檔案事件",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"task_id\":\"demo_task_25\",\"task_type\":\"CLASSIFY_FILE\",\"source\":\"DAY24_INGESTION\",\"input\":{\"files\":[{\"filename\":\"Docker_Desktop_Installer_v4.30.exe\",\"stable\":true}],\"metrics\":{\"mem_percent\":42}}}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 180,
+    "y": 100,
+    "wires": [
+      [
+        "fn_day25_router"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day25_router",
+    "type": "function",
+    "z": "tab_day25",
+    "name": "1. 多任務路由與 Schema 約束 (Function)",
+    "func": "let task;\ntry { task = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch (err) { task = {}; }\nconst routes = {\n  CLASSIFY_FILE: {\n    prompt: t => `請將檔案「${t.input.files?.[0]?.filename || ''}」分類到 Installers、Documents、Archives、Media 或 Others，並說明理由。`,\n    schema: { type: 'object', properties: { category: { type: 'string', enum: ['Installers','Documents','Archives','Media','Others'] }, reason: { type: 'string' } }, required: ['category','reason'] }\n  },\n  PERF_RCA: {\n    prompt: t => `請根據系統指標分析目前狀態：${JSON.stringify(t.input)}`,\n    schema: { type: 'object', properties: { severity: { type: 'string', enum: ['INFO','WARNING','CRITICAL'] }, root_cause: { type: 'string' }, suggested_action: { type: 'string' } }, required: ['severity','root_cause','suggested_action'] }\n  }\n};\nconst route = routes[task.task_type];\nif (!task.task_id || !task.input || !route) {\n    msg.payload = { status: 'UNSUPPORTED_TASK', task_id: task.task_id || null, reason: '缺少必要欄位或不支援的 task_type' };\n    return [null, msg];\n}\nmsg.taskInfo = task;\nmsg.prompt = route.prompt(task);\nmsg.schema = route.schema;\nreturn [msg, null];",
+    "outputs": 2,
+    "x": 500,
+    "y": 100,
+    "wires": [
+      ["subflow_day25_agy_instance"],
+      ["dbg_day25_out"]
+    ]
+  },
+  {
+    "id": "subflow_day25_agy_instance",
+    "type": "subflow:subflow_day25_agy",
+    "z": "tab_day25",
+    "name": "2. 🤖 agy 推理核心大腦",
+    "x": 800,
+    "y": 100,
+    "wires": [["fn_day25_unwrap"]]
+  },
+  {
+    "id": "fn_day25_unwrap",
+    "type": "function",
+    "z": "tab_day25",
+    "name": "3. 雙軌解包與結構化輸出 (Function)",
+    "func": "let parsed;\ntry { parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch (e) { parsed = { response: msg.payload }; }\nlet result = parsed.structured_output || parsed.response || parsed;\nif (typeof result === 'string') { try { result = JSON.parse(result); } catch (e) {} }\nmsg.decision = result;\nmsg.payload = { ...(msg.taskInfo || {}), decision: result };\nreturn msg;",
+    "outputs": 1,
+    "x": 1070,
+    "y": 100,
+    "wires": [
+      [
+        "dbg_day25_out"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day25_out",
+    "type": "debug",
+    "z": "tab_day25",
+    "name": "AI 決策結果",
+    "active": true,
+    "x": 1300,
+    "y": 100,
+    "wires": []
+  }
+]
