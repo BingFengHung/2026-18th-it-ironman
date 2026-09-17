@@ -1,0 +1,146 @@
+[
+  {
+    "id": "tab_day27",
+    "type": "tab",
+    "label": "Day 27 - E2E 強化層：並行保護與快取",
+    "disabled": false
+  },
+  {
+    "id": "subflow_day27_agy",
+    "type": "subflow",
+    "name": "🤖 agy 推理核心大腦",
+    "info": "沿用 Day 14 共用 Subflow，集中處理 agy CLI 呼叫、Schema 與雙軌解包。",
+    "category": "AI 模組",
+    "in": [{ "x": 60, "y": 80, "wires": [{ "id": "fn_day27_agy_command" }] }],
+    "out": [{ "x": 780, "y": 80, "wires": [{ "id": "fn_day27_agy_unpack", "port": 0 }] }],
+    "env": [],
+    "meta": {},
+    "color": "#DDAA99"
+  },
+  {
+    "id": "fn_day27_agy_command",
+    "type": "function",
+    "z": "subflow_day27_agy",
+    "name": "1. 建立 agy 指令",
+    "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\nmsg.payload = cmd;\nreturn msg;",
+    "outputs": 1,
+    "x": 220,
+    "y": 80,
+    "wires": [["exec_day27_agy"]]
+  },
+  {
+    "id": "exec_day27_agy",
+    "type": "exec",
+    "z": "subflow_day27_agy",
+    "command": "",
+    "addpay": "payload",
+    "append": "",
+    "useSpawn": "false",
+    "timer": "120",
+    "winHide": false,
+    "oldrc": false,
+    "name": "2. 呼叫 agy.exe",
+    "x": 420,
+    "y": 80,
+    "wires": [["fn_day27_agy_unpack"], [], []]
+  },
+  {
+    "id": "fn_day27_agy_unpack",
+    "type": "function",
+    "z": "subflow_day27_agy",
+    "name": "3. 雙軌解包",
+    "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try { result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response; } catch (e) { result = parsed.response; }\n}\nmsg.payload = result || parsed;\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 80,
+    "wires": [[]]
+  },
+  {
+    "id": "inj_day27_stress",
+    "type": "inject",
+    "z": "tab_day27",
+    "name": "高頻壓力注入 (快速連點)",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"query\":\"Docker connection refused port 2375\"}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 170,
+    "y": 120,
+    "wires": [
+      [
+        "fn_day27_cache_and_semaphore"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day27_cache_and_semaphore",
+    "type": "function",
+    "z": "tab_day27",
+    "name": "1. MD5 快取閘門 + Semaphore 號誌鎖",
+    "func": "const text = JSON.stringify(msg.payload);\nconst hash = crypto.createHash('md5').update(text).digest('hex');\nconst cache = flow.get('e2e_cache') || {};\nif (cache[hash] && Date.now() - cache[hash].timestamp < 3600 * 1000) {\n    msg.payload = cache[hash].data; msg.fromCache = true;\n    return [msg, null];\n}\nconst activeCount = flow.get('active_e2e_ai') || 0;\nif (activeCount >= 1) {\n    node.warn('🛑 [並行保護] 任務進入降級佇列');\n    msg.payload = { status: 'THROTTLED', reason: 'AI 名額已滿', cache_key: hash };\n    return [null, msg];\n}\nflow.set('active_e2e_ai', activeCount + 1);\nmsg.hash = hash;\nmsg.prompt = `請以繁體中文一句話解釋以下系統事件：${text}`;\nmsg.schema = { type: 'object', properties: { summary: { type: 'string' } }, required: ['summary'] };\nreturn [null, msg];",
+    "outputs": 2,
+    "libs": [
+      {
+        "var": "crypto",
+        "module": "crypto"
+      }
+    ],
+    "x": 480,
+    "y": 120,
+    "wires": [
+      [
+        "dbg_day27_cached"
+      ],
+      [
+        "subflow_day27_agy_instance"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day27_cached",
+    "type": "debug",
+    "z": "tab_day27",
+    "name": "⚡ 0ms 秒回",
+    "active": true,
+    "x": 780,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "subflow_day27_agy_instance",
+    "type": "subflow:subflow_day27_agy",
+    "z": "tab_day27",
+    "name": "2. 🤖 agy 推理核心大腦",
+    "x": 780,
+    "y": 160,
+    "wires": [["fn_day27_release_save"]]
+  },
+  {
+    "id": "fn_day27_release_save",
+    "type": "function",
+    "z": "tab_day27",
+    "name": "2. 釋放鎖並寫入快取 (Function)",
+    "func": "flow.set('active_e2e_ai', 0);\nconst hash = msg.hash;\nif (hash) {\n    const cache = flow.get('e2e_cache') || {};\n    cache[hash] = { data: msg.payload, timestamp: Date.now() };\n    flow.set('e2e_cache', cache);\n}\nnode.status({ fill: 'blue', shape: 'dot', text: '已釋放鎖並寫入快取' });\nreturn msg;",
+    "outputs": 1,
+    "x": 1040,
+    "y": 160,
+    "wires": [
+      ["dbg_day27_live"]
+    ]
+  },
+  {
+    "id": "dbg_day27_live",
+    "type": "debug",
+    "z": "tab_day27",
+    "name": "首次推理成果",
+    "active": true,
+    "x": 1270,
+    "y": 160,
+    "wires": []
+  }
+]
