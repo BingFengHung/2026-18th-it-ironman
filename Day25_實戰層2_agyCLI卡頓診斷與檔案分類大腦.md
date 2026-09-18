@@ -35,7 +35,7 @@ if (!task.task_id || !task.input || !route) {
 
 msg.prompt = route.prompt(task);
 msg.schema = route.schema;
-msg.task = task;
+msg.taskInfo = task; // 保全原始任務上下文
 return [msg, null];
 ```
 
