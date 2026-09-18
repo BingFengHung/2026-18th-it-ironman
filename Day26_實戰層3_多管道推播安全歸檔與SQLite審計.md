@@ -133,6 +133,8 @@ if (!category) {
 
 在 Node-RED 點擊「右上角選單」➔「匯入」即可一鍵部署：
 
+本案例 flow
+
 ![Day 26 範例 flow](image/day26/02.png)
 
 ### 本範例 Flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day26_e2e_actions_audit.json)

@@ -120,6 +120,8 @@ Day26 仍須重新檢查類別白名單、實際路徑與檔案是否存在。AI
 
 在 Node-RED 點擊「右上角選單」➔「匯入」即可一鍵部署：
 
+本案例 flow
+
 ![Day 25 範例 flow](image/day25/02.png)
 
 ### 本範例 Flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day25_e2e_ai_brain.json)
