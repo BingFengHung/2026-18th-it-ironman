@@ -24,7 +24,7 @@
 
 ## 資料流通訊協議（Universal Task Envelope）
 
-Day24～Day28 之間使用同一個任務概念。為了和實際 flow 對齊，正式欄位採用 `snake_case`；`input` 保存採集後資料，`decision`、`execution_status`、`retry` 與 `audit` 則由後續階段逐步補上。
+Day24～Day28 之間使用同一個任務概念。為了和實際 flow 對齊，正式欄位採用 `snake_case`；`input` 保存採集後的現場事實（包含系統指標 `metrics` 與檔案清單 `files`），`decision`、`execution_status`、`retry` 與 `audit` 則由後續階段逐步補上。
 
 ```json
 {
@@ -33,9 +33,11 @@ Day24～Day28 之間使用同一個任務概念。為了和實際 flow 對齊，
   "task_type": "CLASSIFY_FILE",
   "timestamp": "2026-09-15T10:30:00.000Z",
   "input": {
-    "filename": "Docker_Desktop_Installer_v4.30.exe",
     "download_dir": "C:/Users/example/Downloads",
-    "mem_percent": 68
+    "metrics": { "mem_percent": 68, "is_heavy": false },
+    "files": [
+      { "filename": "Docker_Desktop_Installer_v4.30.exe", "size_bytes": 1048576, "stable": true }
+    ]
   },
   "guardrails": {
     "cached": false,
