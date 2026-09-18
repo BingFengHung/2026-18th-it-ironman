@@ -123,9 +123,7 @@ return msg;
 
 ![Day 27 範例 flow](image/day27/02.png)
 
-### 本範例 Flow 位置：👉 [下載 flow_day27_e2e_perf_opt.json](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day27_e2e_perf_opt.json)
-
-完整端到端串接版請參考：[flow_day24_28_e2e_pipeline.json](./flows/flow_day24_28_e2e_pipeline.json)。
+### 本範例 Flow 位置：👉 [下載](https://github.com/BingFengHung/2026-18th-it-ironman/blob/main/flows/flow_day27_e2e_perf_opt.json)
 
 
 ---
@@ -134,4 +132,4 @@ return msg;
 
 今天我們完成了「快取短路」與「並行號誌鎖」的架構整合，為系統築起最堅固的效能防波堤。
 
-明天（Day 28）我們將迎來 E2E 的最終章：**全流程自我修復與異常退避重試**，處理 AI 呼叫失敗時的退避重試與安全 Fallback 降級！
+明天我們將迎來 E2E 的最終章：**全流程自我修復與異常退避重試**，處理 AI 呼叫失敗時的退避重試與安全 Fallback 降級！
