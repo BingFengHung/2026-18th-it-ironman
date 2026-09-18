@@ -1,0 +1,178 @@
+[
+  {
+    "id": "tab_day28",
+    "type": "tab",
+    "label": "Day 28 - E2E 韌性層：自我修復與退避重試",
+    "disabled": false
+  },
+  {
+    "id": "subflow_day28_agy",
+    "type": "subflow",
+    "name": "🤖 agy 推理核心大腦",
+    "info": "沿用 Day 14 共用 Subflow，集中處理 agy CLI 呼叫、Schema 與雙軌解包。",
+    "category": "AI 模組",
+    "in": [{ "x": 60, "y": 80, "wires": [{ "id": "fn_day28_agy_command" }] }],
+    "out": [{ "x": 780, "y": 80, "wires": [{ "id": "fn_day28_agy_unpack", "port": 0 }] }],
+    "env": [],
+    "meta": {},
+    "color": "#DDAA99"
+  },
+  {
+    "id": "fn_day28_agy_command",
+    "type": "function",
+    "z": "subflow_day28_agy",
+    "name": "1. 建立 agy 指令",
+    "func": "const prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\nmsg.payload = cmd;\nreturn msg;",
+    "outputs": 1,
+    "x": 220,
+    "y": 80,
+    "wires": [["exec_day28_agy"]]
+  },
+  {
+    "id": "exec_day28_agy",
+    "type": "exec",
+    "z": "subflow_day28_agy",
+    "command": "",
+    "addpay": "payload",
+    "append": "",
+    "useSpawn": "false",
+    "timer": "120",
+    "winHide": false,
+    "oldrc": false,
+    "name": "2. 呼叫 agy.exe",
+    "x": 420,
+    "y": 80,
+    "wires": [["fn_day28_agy_unpack"], [], []]
+  },
+  {
+    "id": "fn_day28_agy_unpack",
+    "type": "function",
+    "z": "subflow_day28_agy",
+    "name": "3. 雙軌解包",
+    "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try { result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response; } catch (e) { result = parsed.response; }\n}\nmsg.payload = result || parsed;\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 80,
+    "wires": [[]]
+  },
+  {
+    "id": "inj_day28_err_test",
+    "type": "inject",
+    "z": "tab_day28",
+    "name": "模擬不穩定 AI 任務",
+    "props": [
+      {
+        "p": "payload",
+        "v": "{\"query\":\"重啟後台異常日誌分析\"}",
+        "vt": "json"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "x": 160,
+    "y": 100,
+    "wires": [
+      [
+        "fn_day28_retry_state"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day28_retry_state",
+    "type": "function",
+    "z": "tab_day28",
+    "name": "1. 指數退避狀態機 (Function)",
+    "func": "msg.retryCount = msg.retryCount || 0;\nmsg.maxRetries = 3;\n\nif (msg.retryCount > 0) {\n    const delay = Math.pow(2, msg.retryCount - 1) * 1000; // 1s, 2s, 4s 指數退避\n    msg.delay = delay;\n    msg.retry_delay_ms = delay;\n    node.warn(`⏳ 第 ${msg.retryCount} 次重試，退避延遲 ${delay}ms...`);\n}\n\nmsg.prompt = '請做簡要診斷';\nmsg.schema = { type: 'object', properties: { summary: { type: 'string' } }, required: ['summary'] };\nreturn msg;",
+    "outputs": 1,
+    "x": 450,
+    "y": 100,
+    "wires": [
+      ["delay_day28_backoff"]
+    ]
+  },
+  {
+    "id": "delay_day28_backoff",
+    "type": "delay",
+    "z": "tab_day28",
+    "name": "依 retry_delay_ms 實際等待",
+    "pauseType": "delayv",
+    "timeout": "1",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 600,
+    "y": 100,
+    "wires": [["subflow_day28_agy_instance"]]
+  },
+  {
+    "id": "subflow_day28_agy_instance",
+    "type": "subflow:subflow_day28_agy",
+    "z": "tab_day28",
+    "name": "2. 🤖 agy 推理核心大腦",
+    "x": 720,
+    "y": 100,
+    "wires": [["dbg_day28_ok"]]
+  },
+  {
+    "id": "dbg_day28_ok",
+    "type": "debug",
+    "z": "tab_day28",
+    "name": "成功輸出",
+    "active": true,
+    "x": 950,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "catch_day28",
+    "type": "catch",
+    "z": "tab_day28",
+    "name": "全域異常捕獲 (Catch)",
+    "scope": [
+      "subflow_day28_agy_instance"
+    ],
+    "uncaught": false,
+    "x": 420,
+    "y": 200,
+    "wires": [
+      [
+        "fn_day28_fallback"
+      ]
+    ]
+  },
+  {
+    "id": "fn_day28_fallback",
+    "type": "function",
+    "z": "tab_day28",
+    "name": "3. 重試判定與 Fallback 降級保底 (Function)",
+    "func": "const count = msg.retryCount || 0;\nif (count < 3) {\n    msg.retryCount = count + 1;\n    node.warn(`⚠️ 發生異常，觸發第 ${msg.retryCount} 次自我修復重試！`);\n    return [msg, null]; // 第 1 路: 迴路重試\n}\n\n// 超過 3 次重試，觸發本地規則庫 Fallback 降級\nnode.error('🛑 重試耗盡，啟動 Fallback 本地規則庫降級保底！');\nmsg.payload = {\n    status: 'FALLBACK_LOCAL',\n    plain_cause: 'AI CLI 連線中斷，已啟動本機預設安全防護規則。',\n    action_taken: '跳過動態分析，保留現有檔案並寫入 SystemLogs/fallback.log'\n};\nreturn [null, msg]; // 第 2 路: 降級輸出",
+    "outputs": 2,
+    "x": 720,
+    "y": 200,
+    "wires": [
+      [
+        "fn_day28_retry_state"
+      ],
+      [
+        "dbg_day28_fallback"
+      ]
+    ]
+  },
+  {
+    "id": "dbg_day28_fallback",
+    "type": "debug",
+    "z": "tab_day28",
+    "name": "Fallback 保底結果",
+    "active": true,
+    "x": 1020,
+    "y": 220,
+    "wires": []
+  }
+]

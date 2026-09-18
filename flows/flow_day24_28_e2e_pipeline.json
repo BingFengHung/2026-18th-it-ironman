@@ -1,0 +1,247 @@
+[
+  {
+    "id": "tab_day24_28_e2e",
+    "type": "tab",
+    "label": "Day24-28 E2E：採集→決策→執行→韌性",
+    "disabled": false,
+    "info": "端到端整合主流程：Day24 雙軌採集、Day27 快取與並行、Day14/25 agy Subflow 大腦、Day28 退避自癒、Day26 安全落地與審計。"
+  },
+  {
+    "id": "subflow_day24_28_agy",
+    "type": "subflow",
+    "name": "🤖 agy 推理核心大腦",
+    "info": "沿用 Day 14 共用 Subflow，集中處理 agy CLI 呼叫、Schema 約束與雙軌解包防禦。",
+    "category": "AI 模組",
+    "in": [
+      {
+        "x": 60,
+        "y": 80,
+        "wires": [
+          {
+            "id": "fn_subflow_e2e_cmd"
+          }
+        ]
+      }
+    ],
+    "out": [
+      {
+        "x": 780,
+        "y": 80,
+        "wires": [
+          {
+            "id": "fn_subflow_e2e_unpack",
+            "port": 0
+          }
+        ]
+      }
+    ],
+    "env": [],
+    "meta": {},
+    "color": "#DDAA99"
+  },
+  {
+    "id": "fn_subflow_e2e_cmd",
+    "type": "function",
+    "z": "subflow_day24_28_agy",
+    "name": "1. 建立 agy 指令",
+    "func": "flow.set('ai_busy', true);\nconst prompt = msg.prompt || (typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload));\nlet cmd = `agy -p ${JSON.stringify(prompt)} --dangerously-skip-permissions`;\nif (msg.schema) {\n    const schemaStr = typeof msg.schema === 'object' ? JSON.stringify(msg.schema) : msg.schema;\n    cmd += ` --json-schema ${JSON.stringify(schemaStr)} --output-format json`;\n}\nmsg.payload = cmd;\nreturn msg;",
+    "outputs": 1,
+    "x": 220,
+    "y": 80,
+    "wires": [["exec_subflow_e2e_agy"]]
+  },
+  {
+    "id": "exec_subflow_e2e_agy",
+    "type": "exec",
+    "z": "subflow_day24_28_agy",
+    "command": "",
+    "addpay": "payload",
+    "append": "",
+    "useSpawn": "false",
+    "timer": "120",
+    "winHide": false,
+    "oldrc": false,
+    "name": "2. 呼叫 agy.exe",
+    "x": 420,
+    "y": 80,
+    "wires": [["fn_subflow_e2e_unpack"], [], []]
+  },
+  {
+    "id": "fn_subflow_e2e_unpack",
+    "type": "function",
+    "z": "subflow_day24_28_agy",
+    "name": "3. 雙軌解包",
+    "func": "let parsed;\ntry {\n    parsed = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    parsed = { response: msg.payload };\n}\nlet result = parsed.structured_output;\nif (!result && parsed.response) {\n    try {\n        result = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;\n    } catch (e) {\n        result = parsed.response;\n    }\n}\nif (typeof result === 'string') {\n    try {\n        result = JSON.parse(result);\n    } catch (e) {\n        node.error(`AI 輸出非 JSON 格式 (觸發退避自癒): ${result}`, msg);\n        return null;\n    }\n}\nmsg.payload = result || parsed;\nreturn msg;",
+    "outputs": 1,
+    "x": 620,
+    "y": 80,
+    "wires": [[]]
+  },
+  {
+    "id": "inject_day24_28",
+    "type": "inject",
+    "z": "tab_day24_28_e2e",
+    "name": "Day24 觸發採集",
+    "props": [{"p":"payload"}],
+    "repeat": "120",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{}",
+    "payloadType": "json",
+    "x": 140,
+    "y": 100,
+    "wires": [["fn_day24_collect"]]
+  },
+  {
+    "id": "fn_day24_collect",
+    "type": "function",
+    "z": "tab_day24_28_e2e",
+    "name": "Day24 採集系統與 Downloads",
+    "func": "const total = os.totalmem();\nconst free = os.freemem();\nconst homedir = os.homedir();\nconst downloadDir = path.join(homedir, 'Downloads');\nlet files = [];\nlet sourceError = null;\ntry {\n  if (fs.existsSync(downloadDir)) files = fs.readdirSync(downloadDir).filter(name => !name.startsWith('.') && !name.endsWith('.crdownload')).map(name => { const p = path.join(downloadDir, name); const s = fs.statSync(p); return s.isFile() ? { filename: name, path: p, size_bytes: s.size, modified_at: s.mtime.toISOString(), stable: true } : null; }).filter(Boolean).slice(0, 5);\n} catch (err) { sourceError = err.message; }\nmsg.payload = { task_id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, task_type: 'CLASSIFY_FILE', source: 'DAY24_INGESTION', input: { collected_at: new Date().toISOString(), download_dir: downloadDir, metrics: { mem_percent: Math.round(((total - free) / total) * 100), is_heavy: Math.round(((total - free) / total) * 100) > 80 }, files, source_error: sourceError } };\nreturn msg;",
+    "outputs": 1,
+    "libs": [
+      { "var": "os", "module": "os" },
+      { "var": "fs", "module": "fs" },
+      { "var": "path", "module": "path" }
+    ],
+    "x": 390,
+    "y": 100,
+    "wires": [["fn_day24_normalize"]]
+  },
+  {
+    "id": "fn_day24_normalize",
+    "type": "function",
+    "z": "tab_day24_28_e2e",
+    "name": "Day24/25 標準 Task Envelope",
+    "func": "const data = msg.payload || {};\nif (!data.task_id || !data.input) { node.error('缺少 Task Envelope'); return null; }\nmsg.task = data;\nmsg.payload = data;\nreturn msg;",
+    "outputs": 1,
+    "x": 670,
+    "y": 100,
+    "wires": [["fn_day27_gate"]]
+  },
+  {
+    "id": "fn_day27_gate",
+    "type": "function",
+    "z": "tab_day24_28_e2e",
+    "name": "Day27 快取與 Semaphore",
+    "func": "const task = msg.task || msg.payload;\nconst key = crypto.createHash('md5').update(JSON.stringify({ task_type: task.task_type, input: task.input, prompt_version: 'v1' })).digest('hex');\nconst cache = flow.get('e2e_cache') || {};\nif (cache[key] && Date.now() - cache[key].timestamp < 3600000) {\n    msg.payload = cache[key].data;\n    msg.decision = cache[key].data;\n    msg.fromCache = true;\n    return [msg, null];\n}\nif (flow.get('ai_busy')) {\n    msg.payload = { status: 'THROTTLED', task_id: task.task_id, reason: 'AI 名額已滿' };\n    return [null, msg];\n}\nflow.set('ai_busy', true);\nmsg.cacheKey = key;\nmsg.retryCount = msg.retryCount || 0;\nconst file = task.input.files && task.input.files[0];\nmsg.prompt = `請將檔案「${file ? file.filename : ''}」分類到 Installers、Documents、Archives、Media 或 Others，並回傳 category、reason、filename。`;\nmsg.schema = { type: 'object', properties: { filename: {type:'string'}, category: {type:'string', enum:['Installers','Documents','Archives','Media','Others']}, reason: {type:'string'} }, required:['filename','category','reason'] };\nreturn [null, msg];",
+    "outputs": 2,
+    "libs": [
+      { "var": "crypto", "module": "crypto" }
+    ],
+    "x": 160,
+    "y": 220,
+    "wires": [
+      ["fn_day26_execute"],
+      ["subflow_day24_28_agy_inst"]
+    ]
+  },
+  {
+    "id": "subflow_day24_28_agy_inst",
+    "type": "subflow:subflow_day24_28_agy",
+    "z": "tab_day24_28_e2e",
+    "name": "2. 🤖 agy 推理核心大腦",
+    "x": 450,
+    "y": 260,
+    "wires": [["fn_day25_save_decision"]]
+  },
+  {
+    "id": "fn_day25_save_decision",
+    "type": "function",
+    "z": "tab_day24_28_e2e",
+    "name": "Day25/27 儲存決策與更新快取",
+    "func": "flow.set('ai_busy', false);\nconst result = msg.payload;\nmsg.decision = result;\nif (msg.cacheKey) {\n    const cache = flow.get('e2e_cache') || {};\n    cache[msg.cacheKey] = { data: result, timestamp: Date.now() };\n    flow.set('e2e_cache', cache);\n}\nreturn msg;",
+    "outputs": 1,
+    "x": 730,
+    "y": 260,
+    "wires": [["fn_day26_execute"]]
+  },
+  {
+    "id": "fn_day26_execute",
+    "type": "function",
+    "z": "tab_day24_28_e2e",
+    "name": "Day26 驗證、實際搬檔與審計",
+    "func": "let data;\ntry { data = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch (err) { data = {}; }\nif (!data || typeof data !== 'object') data = {};\nconst task = msg.task || {}; const input = task.input || {};\nconst allowed = ['Installers','Documents','Archives','Media','Others']; const category = allowed.includes(data.category) ? data.category : null;\nconst base = path.resolve(input.download_dir || path.join(os.homedir(), 'Downloads')); const filename = path.basename(data.filename || input.files?.[0]?.filename || '');\nconst source = path.resolve(path.join(base, filename)); const target = category ? path.resolve(path.join(base, category, filename)) : null;\nlet status = 'REJECTED'; let error = category ? null : '分類不在白名單或非結構化結果';\nif (category && (!filename || !source.startsWith(base + path.sep) || !target.startsWith(base + path.sep))) error = '缺少檔名或路徑越界';\nelse if (category && (!fs.existsSync(source) || !fs.statSync(source).isFile())) { status = 'SKIPPED'; error = '來源檔案不存在'; }\nelse if (category) { try { fs.mkdirSync(path.dirname(target), {recursive:true}); if (source !== target) fs.renameSync(source, target); status = 'SUCCESS'; } catch (err) { status = 'FAILED'; error = err.message; } }\nconst auditDir = path.join(os.homedir(), 'SystemLogs'); fs.mkdirSync(auditDir, {recursive:true});\nconst audit = { task_id: task.task_id || null, timestamp: new Date().toISOString(), action:'MOVE_FILE', status, source, target, category, error }; fs.appendFileSync(path.join(auditDir, 'audit_trail.log'), JSON.stringify(audit) + '\\n', 'utf8');\nmsg.payload = audit; return msg;",
+    "outputs": 1,
+    "libs": [
+      { "var": "os", "module": "os" },
+      { "var": "fs", "module": "fs" },
+      { "var": "path", "module": "path" }
+    ],
+    "x": 1010,
+    "y": 220,
+    "wires": [["debug_day26_result"]]
+  },
+  {
+    "id": "debug_day26_result",
+    "type": "debug",
+    "z": "tab_day24_28_e2e",
+    "name": "E2E 完成（含審計）",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "x": 1250,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "catch_day28_retry",
+    "type": "catch",
+    "z": "tab_day24_28_e2e",
+    "name": "Day28 捕獲 AI 失敗",
+    "scope": ["subflow_day24_28_agy_inst"],
+    "uncaught": false,
+    "x": 170,
+    "y": 380,
+    "wires": [["fn_day28_retry"]]
+  },
+  {
+    "id": "fn_day28_retry",
+    "type": "function",
+    "z": "tab_day24_28_e2e",
+    "name": "Day28 重試判定與退避時間",
+    "func": "msg.retryCount = (msg.retryCount || 0) + 1;\nflow.set('ai_busy', false);\nif (msg.retryCount <= 3) {\n    const delay = Math.pow(2, msg.retryCount - 1) * 1000;\n    msg.delay = delay;\n    msg.retry_delay_ms = delay;\n    node.warn(`⏳ 第 ${msg.retryCount} 次重試，實際等待 ${delay}ms...`);\n    return [msg, null];\n}\nmsg.payload = { status: 'FALLBACK_LOCAL', action: 'SKIP_FILE_OPERATION', reason: 'AI CLI 重試耗盡' };\nreturn [null, msg];",
+    "outputs": 2,
+    "x": 430,
+    "y": 380,
+    "wires": [
+      ["delay_day28_backoff"],
+      ["debug_day28_fallback"]
+    ]
+  },
+  {
+    "id": "delay_day28_backoff",
+    "type": "delay",
+    "z": "tab_day24_28_e2e",
+    "name": "實際退避等待",
+    "pauseType": "delayv",
+    "timeout": "1",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 680,
+    "y": 360,
+    "wires": [["subflow_day24_28_agy_inst"]]
+  },
+  {
+    "id": "debug_day28_fallback",
+    "type": "debug",
+    "z": "tab_day24_28_e2e",
+    "name": "Day28 Fallback（不執行危險動作）",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "x": 750,
+    "y": 420,
+    "wires": []
+  }
+]
