@@ -28,10 +28,17 @@ Day04 已示範過檔案搬移，Day12 與 Day19 也已建立安全防線。因�
 以下是執行層 Function 節點的核心驗證與落地邏輯：
 
 ```javascript
+// 0. 解析任務 Envelope 與決策上下文 (相容 Day 25 產出與單獨測試)
+const task = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;
+const data = task.decision || task;
+const input = task.input || {};
+const homedir = os.homedir();
+const base = path.resolve(input.download_dir || path.join(homedir, 'Downloads'));
+
 // 1. 零信任白名單檢查：不可直接使用 AI 產生的字串作為目錄名
 const allowed = ['Installers', 'Documents', 'Archives', 'Media', 'Others'];
 const category = allowed.includes(data.category) ? data.category : null;
-const filename = path.basename(String(data.filename || ''));
+const filename = path.basename(String(data.filename || input.files?.[0]?.filename || ''));
 
 // 2. 邊界沙盒防禦：防止 Directory Traversal (目錄遍歷逃逸)
 const source = path.resolve(path.join(base, filename));
